@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// PROMPTDEE API INTEGRATION
+// PROMPTDEE API INTEGRATION — PRODUCTION GRADE
 // Free AI Chat + Image Generation + Prompt Enhancement
 // ═══════════════════════════════════════════════════════════════
 
@@ -11,7 +11,6 @@ async function post(endpoint, payload, timeout = 30000) {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeout);
-
     const res = await fetch(`${BASE_URL}/${endpoint}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -29,10 +28,7 @@ async function get(endpoint, timeout = 10000) {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeout);
-
-    const res = await fetch(`${BASE_URL}/${endpoint}`, {
-      signal: controller.signal,
-    });
+    const res = await fetch(`${BASE_URL}/${endpoint}`, { signal: controller.signal });
     clearTimeout(timer);
     return await res.json();
   } catch (e) {
@@ -40,7 +36,115 @@ async function get(endpoint, timeout = 10000) {
   }
 }
 
-// ── Chat (gpt-4o-mini) ───────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// IMAGE PROMPT ENGINEERING — EXPERT LEVEL
+// ═══════════════════════════════════════════════════════════════
+
+const STYLE_PRESETS = {
+  modern: {
+    suffix: "modern minimalist style, clean lines, gradient background, professional lighting, 4k ultra detailed, sharp focus, award-winning design",
+    negative: "blurry, distorted, text, watermark, low quality, cartoon, anime",
+  },
+  cinematic: {
+    suffix: "cinematic photography, dramatic lighting, shallow depth of field, film grain, anamorphic lens, color grading, volumetric light, 8k",
+    negative: "flat lighting, overexposed, cartoon, illustration, text, watermark",
+  },
+  vibrant: {
+    suffix: "vibrant colors, bold composition, eye-catching, social media optimized, high contrast, dynamic angles, trending on behance, 4k",
+    negative: "muted colors, dark, blurry, text, watermark, low quality",
+  },
+  tech: {
+    suffix: "futuristic technology, neon glow, dark background, holographic elements, circuit patterns, digital art, cyberpunk aesthetic, 4k ultra HD",
+    negative: "hand drawn, sketch, low quality, text, watermark, blurry",
+  },
+  nature: {
+    suffix: "natural lighting, golden hour, organic composition, earth tones, environmental photography, National Geographic style, 8k resolution",
+    negative: "artificial, synthetic, cartoon, text, watermark, oversaturated",
+  },
+  flat: {
+    suffix: "flat design illustration, vector art style, bold colors, clean shapes, modern graphic design, dribbble trending, high resolution",
+    negative: "realistic, 3d, photographic, text, watermark, low quality, gradient",
+  },
+  luxury: {
+    suffix: "luxury aesthetic, gold accents, marble texture, premium feel, elegant composition, studio lighting, high-end product photography, 8k",
+    negative: "cheap, low quality, cartoon, text, watermark, cluttered",
+  },
+  infographic: {
+    suffix: "clean infographic style, data visualization, icons, charts, professional layout, corporate design, white background, sharp vectors",
+    negative: "messy, cluttered, low quality, text, watermark, hand drawn",
+  },
+};
+
+const PLATFORM_SPECS = {
+  twitter: { ratio: "16:9", maxChars: 280, style: "modern" },
+  facebook: { ratio: "1.91:1", maxChars: 500, style: "vibrant" },
+  instagram: { ratio: "1:1", maxChars: 2200, style: "cinematic" },
+  linkedin: { ratio: "1.91:1", maxChars: 1300, style: "modern" },
+  tiktok: { ratio: "9:16", maxChars: 150, style: "vibrant" },
+  youtube: { ratio: "16:9", maxChars: 5000, style: "cinematic" },
+};
+
+function detectContentCategory(content, topic) {
+  const text = `${content} ${topic}`.toLowerCase();
+
+  if (/ai|tech|code|software|programming|digital|cyber|data|cloud|saas/.test(text)) return "tech";
+  if (/food|cook|recipe|restaurant|meal|cuisine|chef/.test(text)) return "food";
+  if (/fitness|workout|gym|health|exercise|yoga|nutrition/.test(text)) return "fitness";
+  if (/travel|adventure|explore|destination|vacation|trip/.test(text)) return "travel";
+  if (/money|finance|invest|stock|crypto|business|startup|entrepreneur/.test(text)) return "finance";
+  if (/fashion|style|outfit|clothing|beauty|makeup|skincare/.test(text)) return "fashion";
+  if (/education|learn|study|course|tutorial|knowledge|tip/.test(text)) return "education";
+  if (/nature|environment|green|sustainable|eco|climate/.test(text)) return "nature";
+  if (/luxury|premium|exclusive|高端|vip/.test(text)) return "luxury";
+  return "modern";
+}
+
+function buildImagePrompt(content, topic, platform = "twitter") {
+  const category = detectContentCategory(content, topic);
+  const spec = PLATFORM_SPECS[platform] || PLATFORM_SPECS.twitter;
+  const style = STYLE_PRESETS[spec.style] || STYLE_PRESETS.modern;
+
+  // Extract key visual concept from content
+  const keyPhrases = content
+    .replace(/[#@]\w+/g, "")
+    .replace(/https?:\/\/\S+/g, "")
+    .replace(/[^\w\s]/g, "")
+    .split(/\s+/)
+    .filter((w) => w.length > 3)
+    .slice(0, 15)
+    .join(", ");
+
+  const categoryPrompts = {
+    tech: `Cutting-edge technology visualization: ${keyPhrases}. Futuristic interface, glowing data streams, holographic displays, dark background with neon blue and purple accents. Ultra-modern, sleek, professional.`,
+
+    food: `Appetizing food photography: ${keyPhrases}. Beautifully plated dish, warm natural lighting, shallow depth of field, wooden table surface, fresh ingredients as props. Magazine-quality food photography.`,
+
+    fitness: `Dynamic fitness photography: ${keyPhrases}. Athletic person in motion, energetic pose, gym or outdoor setting, dramatic lighting, sweat and determination, motivational feel. Sports photography masterclass.`,
+
+    travel: `Breathtaking travel photography: ${keyPhrases}. Stunning landscape, golden hour lighting, epic vista, sense of wonder and adventure, National Geographic quality, vivid colors, dramatic sky.`,
+
+    finance: `Professional finance visualization: ${keyPhrases}. Clean data charts, upward trends, gold and green color scheme, modern office background, professional atmosphere, success imagery. Bloomberg terminal aesthetic.`,
+
+    fashion: `High fashion editorial: ${keyPhrases}. Model in striking pose, dramatic lighting, luxury setting, bold color palette, Vogue magazine quality, artistic composition, haute couture feel.`,
+
+    education: `Educational illustration: ${keyPhrases}. Clean infographic style, knowledge symbols, books and light bulbs, organized layout, bright and inviting colors, professional educational material.`,
+
+    nature: `Stunning nature photography: ${keyPhrases}. Pristine landscape, dramatic weather, golden hour light, rich textures, environmental storytelling, conservation message, earth tones.`,
+
+    luxury: `Luxury lifestyle photography: ${keyPhrases}. Premium materials, gold and marble textures, elegant composition, soft studio lighting, exclusive atmosphere, high-end product placement.`,
+
+    modern: `Modern professional design: ${keyPhrases}. Clean composition, gradient background, geometric shapes, professional feel, contemporary aesthetic, balanced layout, trending design.`,
+  };
+
+  const visualConcept = categoryPrompts[category] || categoryPrompts.modern;
+
+  return `${visualConcept} Aspect ratio ${spec.ratio}. ${style.suffix}. Professional social media content image, scroll-stopping visual, high engagement potential.`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// API FUNCTIONS
+// ═══════════════════════════════════════════════════════════════
+
 export async function chat(message) {
   console.log(`💬 PromptDee [Chat]: ${message.substring(0, 60)}...`);
   const data = await post("ai-chat", { message });
@@ -48,49 +152,113 @@ export async function chat(message) {
   throw new Error(data.message || "Chat failed");
 }
 
-// ── Image Generation (flux-schnell) ───────────────────────────
 export async function generateImage(prompt) {
-  console.log(`🎨 PromptDee [Image]: ${prompt.substring(0, 60)}...`);
+  console.log(`🎨 PromptDee [Image]: ${prompt.substring(0, 80)}...`);
   const data = await post("generate-image", { prompt }, 60000);
   if (data.success) return data.imageUrl;
   throw new Error(data.message || "Image generation failed");
 }
 
-// ── Prompt Enhancement ────────────────────────────────────────
 export async function enhancePrompt(rawPrompt) {
   console.log(`✨ PromptDee [Enhance]: ${rawPrompt.substring(0, 60)}...`);
   const data = await post("enhance-prompt", { prompt: rawPrompt });
   if (data.success) return data.enhanced_prompt;
-  return rawPrompt; // fallback
+  return rawPrompt;
 }
 
-// ── Usage Stats ───────────────────────────────────────────────
 export async function getUsageStats() {
   const data = await get(`usage/${USER_ID}`);
   if (data.today) return data.today;
   return { error: "Could not fetch usage" };
 }
 
-// ── Server Status ─────────────────────────────────────────────
 export async function checkStatus() {
   const data = await get("test");
   return data.status || "Offline";
 }
 
-// ── Generate Image for Post ───────────────────────────────────
-export async function generatePostImage(content, topic) {
-  // Create a good image prompt from the post content
-  const imagePrompt = await chat(
-    `Create a short, vivid image generation prompt (max 100 words) for a social media post about: "${topic}". The image should be eye-catching, modern, and suitable for social media. Return ONLY the prompt, nothing else.`
-  );
+// ═══════════════════════════════════════════════════════════════
+// SMART IMAGE GENERATION — 3 LAYER PROMPT PIPELINE
+// ═══════════════════════════════════════════════════════════════
 
-  // Enhance the prompt for better image quality
-  const enhanced = await enhancePrompt(imagePrompt.substring(0, 200));
+export async function generatePostImage(content, topic, platform = "twitter") {
+  console.log("🎨 [IMAGE PIPELINE] Starting 3-layer prompt engineering...");
 
-  // Generate the image
-  const imageUrl = await generateImage(enhanced.substring(0, 200));
+  // Layer 1: Build expert prompt from content analysis
+  const basePrompt = buildImagePrompt(content, topic, platform);
+  console.log(`  Layer 1 (Base): ${basePrompt.substring(0, 100)}...`);
 
-  return { imageUrl, imagePrompt: enhanced };
+  // Layer 2: Enhance with PromptDee AI
+  let enhancedPrompt;
+  try {
+    enhancedPrompt = await enhancePrompt(basePrompt.substring(0, 300));
+    console.log(`  Layer 2 (Enhanced): ${enhancedPrompt.substring(0, 100)}...`);
+  } catch (e) {
+    enhancedPrompt = basePrompt;
+    console.log(`  Layer 2 (Fallback): Using base prompt`);
+  }
+
+  // Layer 3: Final polish — add quality boosters
+  const finalPrompt = `${enhancedPrompt.substring(0, 300)}, masterpiece, best quality, highly detailed, professional, trending on social media, high engagement visual, no text, no watermark, no logo`;
+
+  console.log(`  Layer 3 (Final): ${finalPrompt.substring(0, 100)}...`);
+
+  // Generate image
+  const imageUrl = await generateImage(finalPrompt);
+
+  return {
+    imageUrl,
+    imagePrompt: finalPrompt,
+    layers: {
+      base: basePrompt,
+      enhanced: enhancedPrompt,
+      final: finalPrompt,
+    },
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BATCH IMAGE GENERATION
+// ═══════════════════════════════════════════════════════════════
+
+export async function generateBatchImages(posts) {
+  const results = [];
+  for (const post of posts) {
+    try {
+      const result = await generatePostImage(post.content, post.topic, post.platform);
+      results.push({ postId: post.id, ...result });
+      // Rate limit: wait between requests
+      await new Promise((r) => setTimeout(r, 2000));
+    } catch (e) {
+      results.push({ postId: post.id, error: e.message });
+    }
+  }
+  return results;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CONTENT ANALYSIS FOR IMAGE
+// ═══════════════════════════════════════════════════════════════
+
+export async function analyzeContentForImage(content) {
+  const response = await chat(`Analyze this social media post and suggest the BEST visual style for maximum engagement:
+
+"${content.substring(0, 300)}"
+
+Reply with ONLY a JSON object:
+{
+  "mood": "energetic/calm/professional/playful/dramatic",
+  "colors": ["primary color", "secondary color"],
+  "composition": "centered/rule-of-thirds/symmetrical/dynamic",
+  "elements": ["key visual element 1", "element 2"],
+  "style": "photography/illustration/3d/abstract/minimalist"
+}`);
+
+  try {
+    return JSON.parse(response);
+  } catch {
+    return { mood: "professional", colors: ["blue", "white"], composition: "centered", elements: ["abstract"], style: "minimalist" };
+  }
 }
 
 export default {
@@ -100,4 +268,9 @@ export default {
   getUsageStats,
   checkStatus,
   generatePostImage,
+  generateBatchImages,
+  analyzeContentForImage,
+  buildImagePrompt,
+  STYLE_PRESETS,
+  PLATFORM_SPECS,
 };

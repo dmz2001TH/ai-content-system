@@ -114,12 +114,14 @@ export default function Dashboard() {
         {[
           { id: "dashboard", icon: "📊", label: "Dashboard" },
           { id: "generate", icon: "🤖", label: "Generate" },
+          { id: "templates", icon: "📋", label: "Templates" },
           { id: "posts", icon: "📝", label: "All Posts" },
           { id: "calendar", icon: "📅", label: "Calendar" },
           { id: "tasks", icon: "✅", label: "Tasks" },
+          { id: "analytics", icon: "📈", label: "Analytics" },
           { id: "config", icon: "⚙️", label: "Config" },
-          { id: "reports", icon: "📈", label: "Reports" },
-          { id: "logs", icon: "📋", label: "Activity Log" },
+          { id: "reports", icon: "📊", label: "Reports" },
+          { id: "logs", icon: "📜", label: "Activity Log" },
         ].map((item) => (
           <button
             key={item.id}
@@ -158,8 +160,10 @@ export default function Dashboard() {
           <PostsPage posts={posts} onPublish={publishPost} onDelete={deletePost} onRefresh={fetchData} />
         )}
         {page === "config" && <ConfigPage config={config} onSave={fetchData} />}
+        {page === "templates" && <TemplatesPage />}
         {page === "calendar" && <CalendarPage />}
         {page === "tasks" && <TasksPage />}
+        {page === "analytics" && <AnalyticsPage />}
         {page === "reports" && <ReportsPage />}
         {page === "logs" && <LogsPage logs={logs} />}
       </main>
@@ -373,18 +377,34 @@ function ReviewDetails({ review }) {
 
 function PostsPage({ posts, onPublish, onDelete, onRefresh }) {
   const [filter, setFilter] = useState("all");
-  const filtered = filter === "all" ? posts : posts.filter((p) => p.status === filter);
+  const [search, setSearch] = useState("");
+  const filtered = (filter === "all" ? posts : posts.filter((p) => p.status === filter))
+    .filter((p) => !search || p.content.toLowerCase().includes(search.toLowerCase()) || (p.topic && p.topic.toLowerCase().includes(search.toLowerCase())));
 
   return (
     <div>
       <h2 style={{ fontSize: 24, fontWeight: 700, marginBottom: 24 }}>All Posts</h2>
 
+      <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 Search posts..." style={{ flex: 1, padding: "10px 14px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 14 }} />
+        <button className="btn btn-secondary btn-sm" onClick={onRefresh}>🔄</button>
+      </div>
+
       <div className="tabs">
-        {["all", "draft", "approved", "posted", "rejected"].map((f) => (
+        {["all", "draft", "approved", "posted", "rejected", "scheduled"].map((f) => (
           <button key={f} className={`tab ${filter === f ? "active" : ""}`} onClick={() => setFilter(f)}>
             {f.charAt(0).toUpperCase() + f.slice(1)} ({f === "all" ? posts.length : posts.filter((p) => p.status === f).length})
           </button>
         ))}
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+        <button className="btn btn-secondary btn-sm" onClick={async () => {
+          const res = await fetch(`${API}/generate-images/batch`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ limit: 5 }) });
+          const data = await res.json();
+          alert(`Generated ${data.results?.filter((r) => r.imageUrl).length || 0} images`);
+          onRefresh();
+        }}>🎨 Generate Images for Top 5</button>
       </div>
 
       {filtered.length === 0 ? (
@@ -443,6 +463,12 @@ function PostItem({ post, onPublish, onDelete, compact }) {
         )}
         <button className="btn btn-secondary btn-sm" onClick={() => generateImage(post.id)}>
           🎨 Image
+        </button>
+        <button className="btn btn-secondary btn-sm" onClick={async () => {
+          await fetch(`${API}/posts/${post.id}/duplicate`, { method: "POST" });
+          onRefresh?.() || window.location.reload();
+        }}>
+          📋 Duplicate
         </button>
         <button className="btn btn-danger btn-sm" onClick={() => onDelete(post.id)}>
           🗑 Delete
@@ -729,6 +755,205 @@ function ReportsPage() {
       <button className="btn btn-secondary" onClick={fetchReport} style={{ marginTop: 8 }}>
         🔄 Refresh Report
       </button>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TEMPLATES PAGE
+// ═══════════════════════════════════════════════════════════════
+
+function TemplatesPage() {
+  const [templates, setTemplates] = useState([]);
+  const [selected, setSelected] = useState(null);
+  const [generating, setGenerating] = useState(false);
+  const [result, setResult] = useState(null);
+
+  useEffect(() => {
+    fetch(`${API}/templates`).then((r) => r.json()).then(setTemplates).catch(() => {});
+  }, []);
+
+  const generateFromTemplate = async (templateId) => {
+    setGenerating(true);
+    try {
+      const res = await fetch(`${API}/templates/${templateId}/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ platform: "twitter" }),
+      });
+      setResult(await res.json());
+    } catch (e) { console.error(e); }
+    setGenerating(false);
+  };
+
+  return (
+    <div>
+      <h2 style={{ fontSize: 24, fontWeight: 700, marginBottom: 24 }}>📋 Content Templates</h2>
+      <p style={{ color: "var(--text-dim)", marginBottom: 20 }}>Quick-start templates for common post formats. Click to generate content instantly.</p>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12, marginBottom: 24 }}>
+        {templates.map((t) => (
+          <div key={t.id} className="card" style={{ cursor: "pointer", borderColor: selected === t.id ? "var(--accent)" : undefined }} onClick={() => setSelected(t.id)}>
+            <div style={{ fontWeight: 600, marginBottom: 8 }}>{t.name}</div>
+            <div style={{ fontSize: 11, color: "var(--text-dim)", marginBottom: 8 }}>Fields: {t.fields.join(", ")}</div>
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+              {t.platforms.map((p) => <span key={p} style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: "var(--bg)" }}>{p}</span>)}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {selected && (
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">Generate from Template</span>
+          </div>
+          <button className="btn btn-primary" onClick={() => generateFromTemplate(selected)} disabled={generating}>
+            {generating ? <><span className="spinner" /> Generating...</> : "🤖 Generate Content"}
+          </button>
+
+          {result && (
+            <div style={{ marginTop: 16, padding: 16, background: "var(--bg)", borderRadius: 8, border: "1px solid var(--border)" }}>
+              <div style={{ fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap", marginBottom: 12 }}>{result.content}</div>
+              {result.hashtags?.length > 0 && (
+                <div>{result.hashtags.map((h, i) => <span key={i} style={{ color: "var(--accent)", marginRight: 8, fontSize: 12 }}>{h}</span>)}</div>
+              )}
+              <button className="btn btn-secondary btn-sm" style={{ marginTop: 12 }} onClick={async () => {
+                await fetch(`${API}/posts`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content: result.content, hook: result.hook, topic: result.topic, hashtags: result.hashtags }) });
+                alert("Saved as draft!");
+              }}>💾 Save as Draft</button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ANALYTICS PAGE
+// ═══════════════════════════════════════════════════════════════
+
+function AnalyticsPage() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [bestTimes, setBestTimes] = useState(null);
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([
+      fetch(`${API}/analytics`).then((r) => r.json()),
+      fetch(`${API}/best-times`).then((r) => r.json()),
+    ])
+      .then(([analytics, times]) => { setData(analytics); setBestTimes(times); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div className="card" style={{ textAlign: "center", padding: 60 }}><span className="spinner" /> Loading analytics...</div>;
+  if (!data) return <div className="card" style={{ textAlign: "center", padding: 60 }}>No data yet.</div>;
+
+  return (
+    <div>
+      <h2 style={{ fontSize: 24, fontWeight: 700, marginBottom: 24 }}>📈 Analytics</h2>
+
+      <div className="stats-grid">
+        <div className="stat-card">
+          <div className="stat-label">Total Posts</div>
+          <div className="stat-value">{data.total}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Avg Score</div>
+          <div className="stat-value green">{data.avgScore}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">With Images</div>
+          <div className="stat-value blue">{data.withImages}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Without Images</div>
+          <div className="stat-value yellow">{data.withoutImages}</div>
+        </div>
+      </div>
+
+      {/* Score Distribution */}
+      <div className="card">
+        <div className="card-title" style={{ marginBottom: 16 }}>📊 Score Distribution</div>
+        <div style={{ display: "flex", gap: 8, alignItems: "flex-end", height: 120 }}>
+          {Object.entries(data.scoreDistribution || {}).map(([range, count]) => {
+            const max = Math.max(...Object.values(data.scoreDistribution || {}), 1);
+            const height = (count / max) * 100;
+            const colors = { "90-100": "var(--green)", "80-89": "#4ade80", "70-79": "var(--yellow)", "60-69": "var(--blue)", "below-60": "var(--red)" };
+            return (
+              <div key={range} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                <span style={{ fontSize: 11, fontWeight: 600 }}>{count}</span>
+                <div style={{ width: "100%", height: `${height}%`, background: colors[range] || "var(--accent)", borderRadius: "4px 4px 0 0", minHeight: 4 }} />
+                <span style={{ fontSize: 9, color: "var(--text-dim)", textAlign: "center" }}>{range}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* By Platform */}
+      <div className="card">
+        <div className="card-title" style={{ marginBottom: 16 }}>📱 Performance by Platform</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
+          {Object.entries(data.byPlatform || {}).map(([platform, stats]) => (
+            <div key={platform} style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8, padding: 14 }}>
+              <div style={{ fontWeight: 600, marginBottom: 8, textTransform: "capitalize" }}>📱 {platform}</div>
+              <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Posts: {stats.count}</div>
+              <div style={{ fontSize: 12, color: "var(--green)" }}>Avg Score: {stats.avgScore}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Top Topics */}
+      <div className="card">
+        <div className="card-title" style={{ marginBottom: 16 }}>🏆 Top Performing Topics</div>
+        {data.topTopics?.length === 0 ? (
+          <p style={{ color: "var(--text-dim)" }}>No topics yet.</p>
+        ) : (
+          data.topTopics?.map((t, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
+              <span style={{ fontWeight: 700, color: "var(--accent)", width: 24 }}>#{i + 1}</span>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontWeight: 500 }}>{t.topic}</span>
+                <span style={{ fontSize: 11, color: "var(--text-dim)", marginLeft: 8 }}>({t.count} posts)</span>
+              </div>
+              <span style={{ fontWeight: 600, color: "var(--green)" }}>{t.avgScore}</span>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Best Times */}
+      {bestTimes && (
+        <div className="card">
+          <div className="card-title" style={{ marginBottom: 16 }}>⏰ Best Times to Post</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12 }}>
+            {Object.entries(bestTimes).map(([platform, times]) => (
+              <div key={platform} style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8, padding: 14 }}>
+                <div style={{ fontWeight: 600, marginBottom: 8, textTransform: "capitalize" }}>📱 {platform}</div>
+                <div style={{ fontSize: 11, color: "var(--text-dim)", marginBottom: 4 }}>Weekdays:</div>
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
+                  {times.weekdays?.map((t) => <span key={t} style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: "var(--accent)", color: "white" }}>{t}</span>)}
+                </div>
+                {times.weekends?.length > 0 && (
+                  <>
+                    <div style={{ fontSize: 11, color: "var(--text-dim)", marginBottom: 4 }}>Weekends:</div>
+                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                      {times.weekends?.map((t) => <span key={t} style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: "var(--bg-hover)" }}>{t}</span>)}
+                    </div>
+                  </>
+                )}
+                <div style={{ fontSize: 10, color: "var(--green)", marginTop: 8 }}>🔥 Peak: {times.peak}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

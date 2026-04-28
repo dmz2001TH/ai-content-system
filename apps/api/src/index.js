@@ -410,6 +410,418 @@ app.get("/logs", async (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════
+// CONTENT TEMPLATES
+// ═══════════════════════════════════════════════════════════════
+
+const CONTENT_TEMPLATES = {
+  "tip": {
+    name: "💡 Quick Tip",
+    template: "💡 {tip_title}\n\n{tip_content}\n\nWhich tip resonates most with you? 👇\n\n{hashtags}",
+    fields: ["tip_title", "tip_content", "hashtags"],
+    platforms: ["twitter", "linkedin", "facebook"],
+  },
+  "listicle": {
+    name: "📋 List Post",
+    template: "{hook}\n\n{numbered_list}\n\nWhich one is your favorite? Drop a comment! 👇\n\n{hashtags}",
+    fields: ["hook", "numbered_list", "hashtags"],
+    platforms: ["twitter", "linkedin", "facebook", "instagram"],
+  },
+  "question": {
+    name: "❓ Engagement Question",
+    template: "{question}\n\nA) {option_a}\nB) {option_b}\nC) {option_c}\n\nVote below! 👇\n\n{hashtags}",
+    fields: ["question", "option_a", "option_b", "option_c", "hashtags"],
+    platforms: ["twitter", "facebook", "instagram"],
+  },
+  "story": {
+    name: "📖 Story Post",
+    template: "{hook}\n\n{story}\n\n{lesson}\n\n{hashtags}",
+    fields: ["hook", "story", "lesson", "hashtags"],
+    platforms: ["linkedin", "facebook", "instagram"],
+  },
+  "thread": {
+    name: "🧵 Thread Starter",
+    template: "{hook}\n\nHere's what I learned 🧵👇\n\n{hashtags}",
+    fields: ["hook", "hashtags"],
+    platforms: ["twitter"],
+  },
+  "announcement": {
+    name: "📢 Announcement",
+    template: "🚀 {announcement}\n\n{details}\n\n{call_to_action}\n\n{hashtags}",
+    fields: ["announcement", "details", "call_to_action", "hashtags"],
+    platforms: ["twitter", "linkedin", "facebook", "instagram"],
+  },
+  "howto": {
+    name: "📝 How-To Guide",
+    template: "How to {title}:\n\n{steps}\n\n💡 Pro tip: {pro_tip}\n\n{hashtags}",
+    fields: ["title", "steps", "pro_tip", "hashtags"],
+    platforms: ["twitter", "linkedin", "facebook"],
+  },
+  "motivation": {
+    name: "💪 Motivational",
+    template: "{quote}\n\n{context}\n\nTag someone who needs to hear this! 👇\n\n{hashtags}",
+    fields: ["quote", "context", "hashtags"],
+    platforms: ["twitter", "instagram", "facebook"],
+  },
+};
+
+app.get("/templates", (req, res) => {
+  const templates = Object.entries(CONTENT_TEMPLATES).map(([id, t]) => ({
+    id,
+    name: t.name,
+    platforms: t.platforms,
+    fields: t.fields,
+  }));
+  res.json(templates);
+});
+
+app.post("/templates/:id/generate", async (req, res) => {
+  try {
+    const template = CONTENT_TEMPLATES[req.params.id];
+    if (!template) return res.status(404).json({ error: "Template not found" });
+
+    const userId = req.body.userId || (await getDefaultUserId());
+    const config = await prisma.config.findUnique({ where: { userId } });
+    const configData = serializeConfig(config);
+
+    const prompt = `You are a social media content expert. Fill in this template for a ${configData?.niche || "technology"} niche with ${configData?.tone || "professional"} tone:
+
+Template: ${template.template}
+Platform: ${req.body.platform || "twitter"}
+
+Create engaging content. Respond with ONLY valid JSON:
+{
+  "content": "the filled template with all fields completed naturally",
+  "hook": "attention-grabbing first line",
+  "topic": "specific topic",
+  "hashtags": ["#tag1", "#tag2"]
+}`;
+
+    const { chat } = await import("@ai-content/promptdee");
+    const response = await chat(prompt);
+    let result;
+    try {
+      result = JSON.parse(response);
+    } catch {
+      result = { content: response, hook: "", topic: configData?.niche || "", hashtags: [] };
+    }
+
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// AUTO HASHTAG GENERATOR
+// ═══════════════════════════════════════════════════════════════
+
+app.post("/generate-hashtags", async (req, res) => {
+  try {
+    const { content, platform, count = 5 } = req.body;
+    if (!content) return res.status(400).json({ error: "content required" });
+
+    const prompt = `Generate ${count} trending, relevant hashtags for this social media post. Make them a mix of popular and niche hashtags for maximum reach.
+
+Platform: ${platform || "twitter"}
+Content: "${content.substring(0, 300)}"
+
+Respond with ONLY valid JSON:
+{
+  "hashtags": ["#hashtag1", "#hashtag2", ...],
+  "trending": ["#trending1", "#trending2"],
+  "niche": ["#niche1", "#niche2"]
+}`;
+
+    const { chat } = await import("@ai-content/promptdee");
+    const response = await chat(prompt);
+    let result;
+    try {
+      result = JSON.parse(response);
+    } catch {
+      result = { hashtags: [], trending: [], niche: [] };
+    }
+
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// BEST TIME TO POST
+// ═══════════════════════════════════════════════════════════════
+
+const BEST_TIMES = {
+  twitter: {
+    weekdays: ["09:00", "12:00", "15:00", "17:00"],
+    weekends: ["10:00", "14:00"],
+    peak: "Wednesday 12:00",
+  },
+  facebook: {
+    weekdays: ["09:00", "13:00", "16:00"],
+    weekends: ["12:00", "13:00"],
+    peak: "Wednesday 11:00",
+  },
+  instagram: {
+    weekdays: ["11:00", "13:00", "19:00", "21:00"],
+    weekends: ["10:00", "14:00", "17:00"],
+    peak: "Friday 11:00",
+  },
+  linkedin: {
+    weekdays: ["07:30", "08:00", "10:00", "12:00"],
+    weekends: [],
+    peak: "Tuesday 10:00",
+  },
+  tiktok: {
+    weekdays: ["12:00", "15:00", "19:00", "21:00"],
+    weekends: ["10:00", "14:00", "18:00"],
+    peak: "Thursday 19:00",
+  },
+};
+
+app.get("/best-times", (req, res) => {
+  const platform = req.query.platform;
+  if (platform && BEST_TIMES[platform]) {
+    return res.json({ platform, ...BEST_TIMES[platform] });
+  }
+  res.json(BEST_TIMES);
+});
+
+// ═══════════════════════════════════════════════════════════════
+// POST PREVIEW (how it looks per platform)
+// ═══════════════════════════════════════════════════════════════
+
+app.get("/posts/:id/preview", async (req, res) => {
+  try {
+    const post = await prisma.post.findUnique({ where: { id: req.params.id } });
+    if (!post) return res.status(404).json({ error: "Post not found" });
+
+    const platform = req.query.platform || post.platform;
+    const spec = {
+      twitter: { maxChars: 280, name: "Twitter/X", icon: "🐦", features: ["threads", "polls", "spaces"] },
+      facebook: { maxChars: 500, name: "Facebook", icon: "📘", features: ["reels", "stories", "groups"] },
+      instagram: { maxChars: 2200, name: "Instagram", icon: "📸", features: ["reels", "stories", "carousel"] },
+      linkedin: { maxChars: 1300, name: "LinkedIn", icon: "💼", features: ["articles", "newsletter", "polls"] },
+      tiktok: { maxChars: 150, name: "TikTok", icon: "🎵", features: ["duet", "stitch", "sounds"] },
+    };
+
+    const p = spec[platform] || spec.twitter;
+    const content = post.content;
+    const isOverLimit = content.length > p.maxChars;
+    const truncated = isOverLimit ? content.substring(0, p.maxChars - 3) + "..." : content;
+
+    res.json({
+      platform,
+      platformName: p.name,
+      icon: p.icon,
+      features: p.features,
+      content: truncated,
+      fullContent: content,
+      charCount: content.length,
+      maxChars: p.maxChars,
+      isOverLimit,
+      remainingChars: p.maxChars - content.length,
+      hashtags: parseJsonField(post.hashtags, []),
+      mediaUrl: post.mediaUrl,
+      hook: post.hook,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// SEARCH POSTS
+// ═══════════════════════════════════════════════════════════════
+
+app.get("/posts/search", async (req, res) => {
+  try {
+    const userId = req.query.userId || (await getDefaultUserId());
+    const { q, platform, status, minScore, maxScore } = req.query;
+
+    const where = { userId };
+    if (platform) where.platform = platform;
+    if (status) where.status = status;
+    if (minScore || maxScore) {
+      where.score = {};
+      if (minScore) where.score.gte = parseInt(minScore);
+      if (maxScore) where.score.lte = parseInt(maxScore);
+    }
+
+    let posts = await prisma.post.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    });
+
+    // Text search (SQLite doesn't have full-text, so filter in JS)
+    if (q) {
+      const query = q.toLowerCase();
+      posts = posts.filter(
+        (p) =>
+          p.content.toLowerCase().includes(query) ||
+          (p.topic && p.topic.toLowerCase().includes(query)) ||
+          (p.hook && p.hook.toLowerCase().includes(query))
+      );
+    }
+
+    res.json({ posts: posts.map(serializePost), total: posts.length });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// DUPLICATE POST
+// ═══════════════════════════════════════════════════════════════
+
+app.post("/posts/:id/duplicate", async (req, res) => {
+  try {
+    const original = await prisma.post.findUnique({ where: { id: req.params.id } });
+    if (!original) return res.status(404).json({ error: "Post not found" });
+
+    const duplicate = await prisma.post.create({
+      data: {
+        userId: original.userId,
+        content: original.content,
+        platform: original.platform,
+        score: original.score,
+        status: "draft",
+        topic: original.topic,
+        hook: original.hook,
+        hashtags: original.hashtags,
+        mediaUrl: original.mediaUrl,
+        imagePrompt: original.imagePrompt,
+        reviewDetails: original.reviewDetails,
+      },
+    });
+
+    await logActivity("post.duplicated", "Post duplicated", { originalId: original.id, newId: duplicate.id });
+    res.json(serializePost(duplicate));
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// BULK IMAGE GENERATION
+// ═══════════════════════════════════════════════════════════════
+
+app.post("/generate-images/batch", async (req, res) => {
+  try {
+    const userId = req.body.userId || (await getDefaultUserId());
+    const limit = Math.min(req.body.limit || 5, 10);
+
+    const posts = await prisma.post.findMany({
+      where: { userId, mediaUrl: null },
+      orderBy: { score: "desc" },
+      take: limit,
+    });
+
+    if (posts.length === 0) return res.json({ message: "No posts without images", results: [] });
+
+    const { generateBatchImages } = await import("@ai-content/promptdee");
+    const results = await generateBatchImages(posts);
+
+    // Update posts with images
+    for (const result of results) {
+      if (result.imageUrl) {
+        await prisma.post.update({
+          where: { id: result.postId },
+          data: { mediaUrl: result.imageUrl, imagePrompt: result.imagePrompt },
+        });
+      }
+    }
+
+    await logActivity("image.batch", `Generated images for ${results.filter((r) => r.imageUrl).length} posts`);
+    res.json({ results, total: results.length });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// CONTENT STATS (advanced analytics)
+// ═══════════════════════════════════════════════════════════════
+
+app.get("/analytics", async (req, res) => {
+  try {
+    const userId = req.query.userId || (await getDefaultUserId());
+
+    const posts = await prisma.post.findMany({ where: { userId } });
+
+    // By platform
+    const byPlatform = {};
+    posts.forEach((p) => {
+      if (!byPlatform[p.platform]) byPlatform[p.platform] = { count: 0, avgScore: 0, totalScore: 0 };
+      byPlatform[p.platform].count++;
+      byPlatform[p.platform].totalScore += p.score;
+    });
+    Object.keys(byPlatform).forEach((k) => {
+      byPlatform[k].avgScore = Math.round(byPlatform[k].totalScore / byPlatform[k].count);
+    });
+
+    // By status
+    const byStatus = {};
+    posts.forEach((p) => {
+      byStatus[p.status] = (byStatus[p.status] || 0) + 1;
+    });
+
+    // By topic
+    const byTopic = {};
+    posts.forEach((p) => {
+      if (p.topic) {
+        if (!byTopic[p.topic]) byTopic[p.topic] = { count: 0, avgScore: 0, totalScore: 0 };
+        byTopic[p.topic].count++;
+        byTopic[p.topic].totalScore += p.score;
+      }
+    });
+    Object.keys(byTopic).forEach((k) => {
+      byTopic[k].avgScore = Math.round(byTopic[k].totalScore / byTopic[k].count);
+    });
+
+    // Top topics sorted by avg score
+    const topTopics = Object.entries(byTopic)
+      .sort((a, b) => b[1].avgScore - a[1].avgScore)
+      .slice(0, 10)
+      .map(([topic, stats]) => ({ topic, ...stats }));
+
+    // Score distribution
+    const scoreDistribution = { "90-100": 0, "80-89": 0, "70-79": 0, "60-69": 0, "below-60": 0 };
+    posts.forEach((p) => {
+      if (p.score >= 90) scoreDistribution["90-100"]++;
+      else if (p.score >= 80) scoreDistribution["80-89"]++;
+      else if (p.score >= 70) scoreDistribution["70-79"]++;
+      else if (p.score >= 60) scoreDistribution["60-69"]++;
+      else scoreDistribution["below-60"]++;
+    });
+
+    // Posts over time (last 30 days)
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const recentPosts = posts.filter((p) => new Date(p.createdAt) >= thirtyDaysAgo);
+    const postsByDay = {};
+    recentPosts.forEach((p) => {
+      const day = new Date(p.createdAt).toISOString().split("T")[0];
+      postsByDay[day] = (postsByDay[day] || 0) + 1;
+    });
+
+    res.json({
+      total: posts.length,
+      avgScore: posts.length > 0 ? Math.round(posts.reduce((s, p) => s + p.score, 0) / posts.length) : 0,
+      byPlatform,
+      byStatus,
+      topTopics,
+      scoreDistribution,
+      postsByDay,
+      withImages: posts.filter((p) => p.mediaUrl).length,
+      withoutImages: posts.filter((p) => !p.mediaUrl).length,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
 // CALENDAR / SCHEDULE
 // ═══════════════════════════════════════════════════════════════
 
