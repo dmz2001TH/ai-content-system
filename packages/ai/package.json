@@ -1,0 +1,12 @@
+{
+  "name": "@ai-content/ai",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "dependencies": {
+    "openai": "^4.94.0"
+  }
+}

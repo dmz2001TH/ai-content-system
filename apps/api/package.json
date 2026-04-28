@@ -1,0 +1,18 @@
+{
+  "name": "@ai-content/api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "@ai-content/db": "*",
+    "@ai-content/ai": "*",
+    "@ai-content/social": "*",
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0"
+  }
+}

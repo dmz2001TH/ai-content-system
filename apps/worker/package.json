@@ -1,0 +1,17 @@
+{
+  "name": "@ai-content/worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "@ai-content/db": "*",
+    "@ai-content/ai": "*",
+    "@ai-content/social": "*",
+    "dotenv": "^16.5.0",
+    "node-cron": "^3.0.3"
+  }
+}

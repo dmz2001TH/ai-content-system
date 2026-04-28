@@ -1,0 +1,81 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  config Config?
+  posts  Post[]
+}
+
+model Config {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  niche      String   @default("technology")
+  tone       String   @default("professional")
+  platforms  String   @default("twitter")  // JSON array stored as string for SQLite
+  frequency  Int      @default(3)
+  doNotTouch String   @default("[]")       // JSON array stored as string
+  brandVoice String   @default("informative and engaging")
+  language   String   @default("en")
+  updatedAt  DateTime @updatedAt
+}
+
+model Post {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content         String
+  platform        String    @default("twitter")
+  score           Int       @default(0)
+  status          String    @default("draft")
+  topic           String?
+  hook            String?
+  hashtags        String    @default("[]")  // JSON array
+  mediaUrl        String?
+  rejectionReason String?
+  reviewDetails   String?   // JSON
+  engagement      String?   // JSON
+  publishedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([userId, status])
+  @@index([createdAt])
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  message   String
+  details   String?  // JSON
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model WeeklyReport {
+  id             String   @id @default(cuid())
+  userId         String
+  weekStart      DateTime
+  weekEnd        DateTime
+  totalPosts     Int      @default(0)
+  avgScore       Float    @default(0)
+  bestPostId     String?
+  worstPostId    String?
+  topTopics      String?  // JSON
+  recommendations String? // JSON
+  createdAt      DateTime @default(now())
+}

@@ -1,0 +1,23 @@
+{
+  "name": "ai-content-system",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:worker\" \"npm run dev:web\"",
+    "dev:api": "npm run dev -w apps/api",
+    "dev:worker": "npm run dev -w apps/worker",
+    "dev:web": "npm run dev -w apps/web",
+    "start:api": "npm run start -w apps/api",
+    "start:worker": "npm run start -w apps/worker",
+    "db:push": "npm run db:push -w packages/db",
+    "db:generate": "npm run db:generate -w packages/db",
+    "db:seed": "npm run seed -w packages/db"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
