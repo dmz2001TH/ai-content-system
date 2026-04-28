@@ -115,6 +115,8 @@ export default function Dashboard() {
           { id: "dashboard", icon: "📊", label: "Dashboard" },
           { id: "generate", icon: "🤖", label: "Generate" },
           { id: "posts", icon: "📝", label: "All Posts" },
+          { id: "calendar", icon: "📅", label: "Calendar" },
+          { id: "tasks", icon: "✅", label: "Tasks" },
           { id: "config", icon: "⚙️", label: "Config" },
           { id: "reports", icon: "📈", label: "Reports" },
           { id: "logs", icon: "📋", label: "Activity Log" },
@@ -156,6 +158,8 @@ export default function Dashboard() {
           <PostsPage posts={posts} onPublish={publishPost} onDelete={deletePost} onRefresh={fetchData} />
         )}
         {page === "config" && <ConfigPage config={config} onSave={fetchData} />}
+        {page === "calendar" && <CalendarPage />}
+        {page === "tasks" && <TasksPage />}
         {page === "reports" && <ReportsPage />}
         {page === "logs" && <LogsPage logs={logs} />}
       </main>
@@ -398,6 +402,14 @@ function PostItem({ post, onPublish, onDelete, compact }) {
   const scoreClass = post.score >= 80 ? "score-high" : post.score >= 60 ? "score-mid" : "score-low";
   const statusClass = `badge-${post.status}`;
 
+  const generateImage = async (id) => {
+    try {
+      const res = await fetch(`${API}/posts/${id}/generate-image`, { method: "POST" });
+      const data = await res.json();
+      if (data.imageUrl) alert("✅ Image generated: " + data.imageUrl);
+    } catch (e) { alert("❌ Failed: " + e.message); }
+  };
+
   return (
     <div className="post-item">
       <div className="post-meta">
@@ -405,6 +417,7 @@ function PostItem({ post, onPublish, onDelete, compact }) {
         <span className={`badge ${statusClass}`}>{post.status}</span>
         <span style={{ color: "var(--text-dim)", fontSize: 12 }}>📱 {post.platform}</span>
         {post.topic && <span style={{ color: "var(--text-dim)", fontSize: 12 }}>🏷 {post.topic}</span>}
+        {post.scheduledAt && <span style={{ color: "var(--blue)", fontSize: 12 }}>⏰ {new Date(post.scheduledAt).toLocaleDateString()}</span>}
         <span style={{ color: "var(--text-dim)", fontSize: 12, marginLeft: "auto" }}>
           {new Date(post.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
         </span>
@@ -428,6 +441,9 @@ function PostItem({ post, onPublish, onDelete, compact }) {
             🚀 Publish
           </button>
         )}
+        <button className="btn btn-secondary btn-sm" onClick={() => generateImage(post.id)}>
+          🎨 Image
+        </button>
         <button className="btn btn-danger btn-sm" onClick={() => onDelete(post.id)}>
           🗑 Delete
         </button>
@@ -713,6 +729,232 @@ function ReportsPage() {
       <button className="btn btn-secondary" onClick={fetchReport} style={{ marginTop: 8 }}>
         🔄 Refresh Report
       </button>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CALENDAR PAGE
+// ═══════════════════════════════════════════════════════════════
+
+function CalendarPage() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
+  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+
+  const fetchCalendar = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API}/calendar?month=${currentMonth}&year=${currentYear}`);
+      setData(await res.json());
+    } catch (e) { console.error(e); }
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchCalendar(); }, [currentMonth, currentYear]);
+
+  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+
+  const prevMonth = () => { if (currentMonth === 0) { setCurrentMonth(11); setCurrentYear(currentYear - 1); } else setCurrentMonth(currentMonth - 1); };
+  const nextMonth = () => { if (currentMonth === 11) { setCurrentMonth(0); setCurrentYear(currentYear + 1); } else setCurrentMonth(currentMonth + 1); };
+
+  const days = [];
+  for (let i = 0; i < firstDay; i++) days.push(null);
+  for (let i = 1; i <= daysInMonth; i++) days.push(i);
+
+  return (
+    <div>
+      <h2 style={{ fontSize: 24, fontWeight: 700, marginBottom: 24 }}>📅 Content Calendar</h2>
+
+      <div className="card">
+        <div className="card-header">
+          <button className="btn btn-secondary btn-sm" onClick={prevMonth}>← Prev</button>
+          <span className="card-title">{monthNames[currentMonth]} {currentYear}</span>
+          <button className="btn btn-secondary btn-sm" onClick={nextMonth}>Next →</button>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
+          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+            <div key={d} style={{ textAlign: "center", padding: 8, fontSize: 12, fontWeight: 600, color: "var(--text-dim)" }}>{d}</div>
+          ))}
+          {days.map((day, i) => {
+            if (day === null) return <div key={`empty-${i}`} />;
+            const dateKey = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+            const posts = data?.calendar?.[dateKey] || [];
+            const isToday = new Date().toISOString().split("T")[0] === dateKey;
+
+            return (
+              <div key={dateKey} style={{
+                background: isToday ? "rgba(99,102,241,0.1)" : "var(--bg)",
+                border: `1px solid ${isToday ? "var(--accent)" : "var(--border)"}`,
+                borderRadius: 8,
+                padding: 8,
+                minHeight: 80,
+                cursor: posts.length ? "pointer" : "default",
+              }}>
+                <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4, color: isToday ? "var(--accent)" : "var(--text-dim)" }}>{day}</div>
+                {posts.slice(0, 3).map((p, j) => (
+                  <div key={j} style={{
+                    fontSize: 10,
+                    padding: "2px 4px",
+                    marginBottom: 2,
+                    borderRadius: 4,
+                    background: p.status === "posted" ? "rgba(34,197,94,0.15)" : p.status === "scheduled" ? "rgba(59,130,246,0.15)" : "rgba(113,113,122,0.15)",
+                    color: p.status === "posted" ? "var(--green)" : p.status === "scheduled" ? "var(--blue)" : "var(--text-dim)",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}>
+                    {p.status === "posted" ? "✅" : p.status === "scheduled" ? "⏰" : "📝"} {p.content?.substring(0, 20)}...
+                  </div>
+                ))}
+                {posts.length > 3 && <div style={{ fontSize: 9, color: "var(--text-dim)" }}>+{posts.length - 3} more</div>}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 16 }}>
+        <div className="card-title" style={{ marginBottom: 12 }}>Legend</div>
+        <div style={{ display: "flex", gap: 16, fontSize: 12 }}>
+          <span>✅ Posted</span>
+          <span style={{ color: "var(--blue)" }}>⏰ Scheduled</span>
+          <span style={{ color: "var(--text-dim)" }}>📝 Draft</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TASKS PAGE
+// ═══════════════════════════════════════════════════════════════
+
+function TasksPage() {
+  const [tasks, setTasks] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState("");
+  const [schedulingId, setSchedulingId] = useState(null);
+
+  const fetchTasks = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API}/tasks`);
+      setTasks(await res.json());
+    } catch (e) { console.error(e); }
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchTasks(); }, []);
+
+  const schedulePost = async (id) => {
+    if (!scheduleDate) return alert("Select a date first");
+    try {
+      await fetch(`${API}/posts/${id}/schedule`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scheduledAt: scheduleDate }),
+      });
+      setSchedulingId(null);
+      setScheduleDate("");
+      fetchTasks();
+    } catch (e) { console.error(e); }
+  };
+
+  const generateImage = async (id) => {
+    try {
+      const res = await fetch(`${API}/posts/${id}/generate-image`, { method: "POST" });
+      const data = await res.json();
+      if (data.imageUrl) alert("Image generated! URL: " + data.imageUrl);
+      fetchTasks();
+    } catch (e) { alert("Image generation failed: " + e.message); }
+  };
+
+  if (loading) return <div className="card" style={{ textAlign: "center", padding: 60 }}><span className="spinner" /> Loading tasks...</div>;
+
+  return (
+    <div>
+      <h2 style={{ fontSize: 24, fontWeight: 700, marginBottom: 24 }}>✅ Task Board</h2>
+
+      <div className="stats-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+        <div className="stat-card">
+          <div className="stat-label">Today</div>
+          <div className="stat-value blue">{tasks?.summary?.today || 0}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Upcoming</div>
+          <div className="stat-value green">{tasks?.summary?.upcoming || 0}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Overdue</div>
+          <div className="stat-value" style={{ color: "var(--red)" }}>{tasks?.summary?.overdue || 0}</div>
+        </div>
+      </div>
+
+      {/* Today */}
+      {tasks?.today?.length > 0 && (
+        <div className="card">
+          <div className="card-header"><span className="card-title">📌 Today</span></div>
+          {tasks.today.map((p) => (
+            <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: "1px solid var(--border)" }}>
+              <div className={`score ${p.score >= 80 ? "score-high" : p.score >= 60 ? "score-mid" : "score-low"}`}>{p.score}</div>
+              <div style={{ flex: 1, fontSize: 13 }}>{p.content?.substring(0, 100)}...</div>
+              <span style={{ fontSize: 11, color: "var(--text-dim)" }}>{p.platform}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Overdue */}
+      {tasks?.overdue?.length > 0 && (
+        <div className="card" style={{ borderColor: "rgba(239,68,68,0.3)" }}>
+          <div className="card-header"><span className="card-title" style={{ color: "var(--red)" }}>⚠️ Overdue</span></div>
+          {tasks.overdue.map((p) => (
+            <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: "1px solid var(--border)" }}>
+              <div className="score score-low">{p.score}</div>
+              <div style={{ flex: 1, fontSize: 13 }}>{p.content?.substring(0, 100)}...</div>
+              <span style={{ fontSize: 11, color: "var(--red)" }}>
+                {p.scheduledAt ? new Date(p.scheduledAt).toLocaleDateString() : "No date"}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Upcoming */}
+      <div className="card">
+        <div className="card-header"><span className="card-title">📅 Upcoming Schedule</span></div>
+        {tasks?.upcoming?.length === 0 ? (
+          <p style={{ textAlign: "center", padding: 40, color: "var(--text-dim)" }}>No scheduled posts. Schedule posts from the All Posts page.</p>
+        ) : (
+          tasks?.upcoming?.map((p) => (
+            <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: "1px solid var(--border)" }}>
+              <div className={`score ${p.score >= 80 ? "score-high" : "score-mid"}`}>{p.score}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13 }}>{p.content?.substring(0, 100)}...</div>
+                <div style={{ fontSize: 11, color: "var(--blue)", marginTop: 2 }}>
+                  ⏰ {p.scheduledAt ? new Date(p.scheduledAt).toLocaleString() : "No date"}
+                </div>
+              </div>
+              <button className="btn btn-secondary btn-sm" onClick={() => generateImage(p.id)}>🎨 Image</button>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Schedule a post */}
+      <div className="card">
+        <div className="card-header"><span className="card-title">➕ Schedule a Post</span></div>
+        <p style={{ fontSize: 13, color: "var(--text-dim)", marginBottom: 12 }}>Go to All Posts, copy a post ID, then schedule it here:</p>
+        <div style={{ display: "flex", gap: 8 }}>
+          <input type="datetime-local" value={scheduleDate} onChange={(e) => setScheduleDate(e.target.value)} style={{ flex: 1, padding: "10px 14px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }} />
+          <button className="btn btn-primary btn-sm" onClick={() => { const id = prompt("Enter Post ID:"); if (id) schedulePost(id); }}>Schedule</button>
+        </div>
+      </div>
     </div>
   );
 }

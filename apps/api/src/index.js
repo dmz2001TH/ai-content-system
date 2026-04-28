@@ -9,6 +9,7 @@ import {
   generateWeeklyAnalysis,
 } from "@ai-content/ai";
 import { postToPlatform } from "@ai-content/social";
+import { generatePostImage, checkStatus as promptdeeStatus, getUsageStats } from "@ai-content/promptdee";
 
 const app = express();
 const PORT = process.env.API_PORT || 3001;
@@ -403,6 +404,136 @@ app.get("/logs", async (req, res) => {
       take: limit,
     });
     res.json(logs);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// CALENDAR / SCHEDULE
+// ═══════════════════════════════════════════════════════════════
+
+app.get("/calendar", async (req, res) => {
+  try {
+    const userId = req.query.userId || (await getDefaultUserId());
+    const { month, year } = req.query;
+
+    const now = new Date();
+    const m = parseInt(month) || now.getMonth();
+    const y = parseInt(year) || now.getFullYear();
+    const start = new Date(y, m, 1);
+    const end = new Date(y, m + 1, 0, 23, 59, 59);
+
+    const posts = await prisma.post.findMany({
+      where: {
+        userId,
+        OR: [
+          { scheduledAt: { gte: start, lte: end } },
+          { publishedAt: { gte: start, lte: end } },
+          { createdAt: { gte: start, lte: end } },
+        ],
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
+    const calendar = {};
+    posts.forEach((p) => {
+      const dateKey = (p.scheduledAt || p.publishedAt || p.createdAt)
+        .toISOString()
+        .split("T")[0];
+      if (!calendar[dateKey]) calendar[dateKey] = [];
+      calendar[dateKey].push(serializePost(p));
+    });
+
+    res.json({ month: m + 1, year, calendar, totalPosts: posts.length });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/posts/:id/schedule", async (req, res) => {
+  try {
+    const { scheduledAt } = req.body;
+    if (!scheduledAt) return res.status(400).json({ error: "scheduledAt required (ISO date)" });
+
+    const post = await prisma.post.update({
+      where: { id: req.params.id },
+      data: { scheduledAt: new Date(scheduledAt), status: "scheduled" },
+    });
+
+    await logActivity("post.scheduled", `Post scheduled for ${scheduledAt}`, { postId: post.id });
+    res.json(serializePost(post));
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/tasks", async (req, res) => {
+  try {
+    const userId = req.query.userId || (await getDefaultUserId());
+    const now = new Date();
+
+    const [upcoming, overdue, today] = await Promise.all([
+      prisma.post.findMany({
+        where: { userId, status: "scheduled", scheduledAt: { gt: now } },
+        orderBy: { scheduledAt: "asc" },
+        take: 20,
+      }),
+      prisma.post.findMany({
+        where: { userId, status: "scheduled", scheduledAt: { lt: now } },
+        orderBy: { scheduledAt: "asc" },
+      }),
+      prisma.post.findMany({
+        where: {
+          userId,
+          scheduledAt: {
+            gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
+            lte: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59),
+          },
+        },
+        orderBy: { scheduledAt: "asc" },
+      }),
+    ]);
+
+    res.json({
+      today: today.map(serializePost),
+      upcoming: upcoming.map(serializePost),
+      overdue: overdue.map(serializePost),
+      summary: { today: today.length, upcoming: upcoming.length, overdue: overdue.length },
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// IMAGE GENERATION (PromptDee)
+// ═══════════════════════════════════════════════════════════════
+
+app.post("/posts/:id/generate-image", async (req, res) => {
+  try {
+    const post = await prisma.post.findUnique({ where: { id: req.params.id } });
+    if (!post) return res.status(404).json({ error: "Post not found" });
+
+    const { imageUrl, imagePrompt } = await generatePostImage(post.content, post.topic || "social media");
+
+    const updated = await prisma.post.update({
+      where: { id: post.id },
+      data: { mediaUrl: imageUrl, imagePrompt },
+    });
+
+    await logActivity("image.generated", "Image generated for post", { postId: post.id });
+    res.json({ post: serializePost(updated), imageUrl, imagePrompt });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/promptdee/status", async (req, res) => {
+  try {
+    const status = await promptdeeStatus();
+    const usage = await getUsageStats();
+    res.json({ status, usage });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

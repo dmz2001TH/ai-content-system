@@ -44,9 +44,11 @@ model Post {
   hook            String?
   hashtags        String    @default("[]")  // JSON array
   mediaUrl        String?
+  imagePrompt     String?   // prompt ที่ใช้ generate รูป
   rejectionReason String?
   reviewDetails   String?   // JSON
   engagement      String?   // JSON
+  scheduledAt     DateTime? // วันที่จะโพสต์
   publishedAt     DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
