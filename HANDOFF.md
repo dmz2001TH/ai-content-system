@@ -170,3 +170,33 @@ Worker (cron) runs independently
 
 ---
 
+
+## 🧪 Test Results (2026-04-29 06:05 GMT+8)
+
+All tests passed on Linux (Node.js v22, Prisma 6.19.3):
+
+| # | Endpoint | Status | Notes |
+|---|----------|--------|-------|
+| 1 | `GET /health` | ✅ | `{"status":"ok","database":"connected"}` |
+| 2 | `POST /config` | ✅ | Creates default config |
+| 3 | `GET /posts` | ✅ | Returns `{posts:[], total:0}` |
+| 4 | `GET /posts/stats` | ✅ | Returns all zeros initially |
+| 5 | `GET /templates` | ✅ | Returns 8 templates |
+| 6 | `GET /best-times` | ✅ | Returns all 5 platforms |
+| 7 | `GET /analytics` | ✅ | Returns empty analytics |
+| 8 | `GET /tasks` | ✅ | Returns `{today:[], upcoming:[], overdue:[]}` |
+| 9 | `GET /calendar` | ✅ | Returns calendar data |
+| 10 | `GET /logs` | ✅ | Returns activity logs |
+| 11 | `GET /platforms/credentials` | ✅ | Returns `[]` initially |
+| 12 | `GET /reports/weekly` | ✅ | Calls DeepSeek for analysis |
+| 13 | `POST /generate` | ✅ | **Auto-generates image!** Score: 91/100 |
+| 14 | `POST /platforms/credentials` | ✅ | Saves + masks sensitive values |
+| 15 | `DELETE /platforms/credentials/:p` | ✅ | Deletes credentials |
+| 16 | `GET /posts` (after generate) | ✅ | Post saved with `mediaUrl` populated |
+| 17 | Next.js build | ✅ | No errors, static pages generated |
+
+**Auto-image test result:**
+- Content: "Quantum computing isn't just for physicists anymore..."
+- Score: 91/100 (all 5 gates passed)
+- Image: `https://replicate.delivery/xezq/...out-0.webp` ✅
+- Post saved with `mediaUrl` and `imagePrompt` fields
