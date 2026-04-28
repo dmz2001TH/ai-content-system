@@ -14,8 +14,9 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  config Config?
-  posts  Post[]
+  config      Config?
+  posts       Post[]
+  credentials PlatformCredential[]
 }
 
 model Config {
@@ -30,6 +31,19 @@ model Config {
   brandVoice String   @default("informative and engaging")
   language   String   @default("en")
   updatedAt  DateTime @updatedAt
+}
+
+model PlatformCredential {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform    String   // twitter, facebook, linkedin, instagram
+  credentials String   @default("{}") // JSON: { apiKey, apiSecret, accessToken, ... }
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, platform])
 }
 
 model Post {

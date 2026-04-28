@@ -55,7 +55,7 @@ export default function Dashboard() {
     try {
       const res = await fetch(`${API}/generate`, { method: "POST" });
       const data = await res.json();
-      setLastReview(data.review);
+      setLastReview({ ...data.review, image: data.image });
       await fetchData();
     } catch (e) {
       setLastReview({ error: e.message });
@@ -223,6 +223,11 @@ function DashboardPage({ stats, posts, generating, lastReview, onGenerate, onBat
               <p style={{ color: "var(--red)" }}>Error: {lastReview.error}</p>
             ) : (
               <div>
+                {lastReview.image?.url && (
+                  <div style={{ marginBottom: 12, borderRadius: 10, overflow: "hidden", border: "1px solid var(--border)" }}>
+                    <img src={lastReview.image.url} alt="Generated visual" style={{ width: "100%", maxHeight: 200, objectFit: "cover", display: "block" }} />
+                  </div>
+                )}
                 <div style={{ display: "flex", gap: 16, alignItems: "center", marginBottom: 8 }}>
                   <div className={`score ${lastReview.score >= 80 ? "score-high" : lastReview.score >= 60 ? "score-mid" : "score-low"}`}>
                     {lastReview.score}
@@ -230,7 +235,7 @@ function DashboardPage({ stats, posts, generating, lastReview, onGenerate, onBat
                   <div>
                     <div style={{ fontWeight: 600 }}>{lastReview.passed ? "✅ Approved" : "⚠️ Needs Review"}</div>
                     <div style={{ fontSize: 12, color: "var(--text-dim)" }}>
-                      {lastReview.attempts} attempt(s)
+                      {lastReview.attempts} attempt(s) {lastReview.image?.url && "• 🎨 Image generated"}
                     </div>
                   </div>
                 </div>
@@ -398,14 +403,7 @@ function PostsPage({ posts, onPublish, onDelete, onRefresh }) {
         ))}
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        <button className="btn btn-secondary btn-sm" onClick={async () => {
-          const res = await fetch(`${API}/generate-images/batch`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ limit: 5 }) });
-          const data = await res.json();
-          alert(`Generated ${data.results?.filter((r) => r.imageUrl).length || 0} images`);
-          onRefresh();
-        }}>🎨 Generate Images for Top 5</button>
-      </div>
+      {/* Image generation is now automatic with post generation */}
 
       {filtered.length === 0 ? (
         <div className="card" style={{ textAlign: "center", padding: 60, color: "var(--text-dim)" }}>
@@ -443,6 +441,12 @@ function PostItem({ post, onPublish, onDelete, compact }) {
         </span>
       </div>
 
+      {post.mediaUrl && (
+        <div style={{ margin: "12px 0", borderRadius: 10, overflow: "hidden", border: "1px solid var(--border)" }}>
+          <img src={post.mediaUrl} alt="Post visual" style={{ width: "100%", maxHeight: compact ? 160 : 300, objectFit: "cover", display: "block" }} loading="lazy" />
+        </div>
+      )}
+
       <div className="post-content" style={compact ? { maxHeight: 80, overflow: "hidden" } : {}}>
         {post.content}
       </div>
@@ -461,9 +465,6 @@ function PostItem({ post, onPublish, onDelete, compact }) {
             🚀 Publish
           </button>
         )}
-        <button className="btn btn-secondary btn-sm" onClick={() => generateImage(post.id)}>
-          🎨 Image
-        </button>
         <button className="btn btn-secondary btn-sm" onClick={async () => {
           await fetch(`${API}/posts/${post.id}/duplicate`, { method: "POST" });
           onRefresh?.() || window.location.reload();
@@ -642,6 +643,9 @@ function ConfigPage({ config, onSave }) {
           {saving ? "Saving..." : "💾 Save Configuration"}
         </button>
       </div>
+
+      {/* ── Platform Credentials ──────────────────────────────── */}
+      <PlatformCredentials />
     </div>
   );
 }
@@ -1126,7 +1130,11 @@ function TasksPage() {
           <div className="card-header"><span className="card-title">📌 Today</span></div>
           {tasks.today.map((p) => (
             <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: "1px solid var(--border)" }}>
-              <div className={`score ${p.score >= 80 ? "score-high" : p.score >= 60 ? "score-mid" : "score-low"}`}>{p.score}</div>
+              {p.mediaUrl ? (
+                <img src={p.mediaUrl} alt="" style={{ width: 56, height: 56, borderRadius: 8, objectFit: "cover", border: "1px solid var(--border)" }} />
+              ) : (
+                <div className={`score ${p.score >= 80 ? "score-high" : p.score >= 60 ? "score-mid" : "score-low"}`}>{p.score}</div>
+              )}
               <div style={{ flex: 1, fontSize: 13 }}>{p.content?.substring(0, 100)}...</div>
               <span style={{ fontSize: 11, color: "var(--text-dim)" }}>{p.platform}</span>
             </div>
@@ -1140,7 +1148,11 @@ function TasksPage() {
           <div className="card-header"><span className="card-title" style={{ color: "var(--red)" }}>⚠️ Overdue</span></div>
           {tasks.overdue.map((p) => (
             <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: "1px solid var(--border)" }}>
-              <div className="score score-low">{p.score}</div>
+              {p.mediaUrl ? (
+                <img src={p.mediaUrl} alt="" style={{ width: 56, height: 56, borderRadius: 8, objectFit: "cover", border: "1px solid var(--border)" }} />
+              ) : (
+                <div className="score score-low">{p.score}</div>
+              )}
               <div style={{ flex: 1, fontSize: 13 }}>{p.content?.substring(0, 100)}...</div>
               <span style={{ fontSize: 11, color: "var(--red)" }}>
                 {p.scheduledAt ? new Date(p.scheduledAt).toLocaleDateString() : "No date"}
@@ -1158,14 +1170,17 @@ function TasksPage() {
         ) : (
           tasks?.upcoming?.map((p) => (
             <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: "1px solid var(--border)" }}>
-              <div className={`score ${p.score >= 80 ? "score-high" : "score-mid"}`}>{p.score}</div>
+              {p.mediaUrl ? (
+                <img src={p.mediaUrl} alt="" style={{ width: 56, height: 56, borderRadius: 8, objectFit: "cover", border: "1px solid var(--border)" }} />
+              ) : (
+                <div className={`score ${p.score >= 80 ? "score-high" : "score-mid"}`}>{p.score}</div>
+              )}
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 13 }}>{p.content?.substring(0, 100)}...</div>
                 <div style={{ fontSize: 11, color: "var(--blue)", marginTop: 2 }}>
                   ⏰ {p.scheduledAt ? new Date(p.scheduledAt).toLocaleString() : "No date"}
                 </div>
               </div>
-              <button className="btn btn-secondary btn-sm" onClick={() => generateImage(p.id)}>🎨 Image</button>
             </div>
           ))
         )}
@@ -1179,6 +1194,181 @@ function TasksPage() {
           <input type="datetime-local" value={scheduleDate} onChange={(e) => setScheduleDate(e.target.value)} style={{ flex: 1, padding: "10px 14px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }} />
           <button className="btn btn-primary btn-sm" onClick={() => { const id = prompt("Enter Post ID:"); if (id) schedulePost(id); }}>Schedule</button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+
+
+// ═══════════════════════════════════════════════════════════════
+// PLATFORM CREDENTIALS COMPONENT
+// ═══════════════════════════════════════════════════════════════
+
+function PlatformCredentials() {
+  const [credentials, setCredentials] = useState([]);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(null);
+
+  const platformDefs = {
+    twitter: {
+      name: "🐦 Twitter/X",
+      fields: [
+        { key: "apiKey", label: "API Key", type: "text" },
+        { key: "apiSecret", label: "API Secret", type: "password" },
+        { key: "accessToken", label: "Access Token", type: "password" },
+        { key: "accessTokenSecret", label: "Access Token Secret", type: "password" },
+      ],
+    },
+    facebook: {
+      name: "📘 Facebook",
+      fields: [
+        { key: "pageId", label: "Page ID", type: "text" },
+        { key: "accessToken", label: "Page Access Token", type: "password" },
+      ],
+    },
+    linkedin: {
+      name: "💼 LinkedIn",
+      fields: [
+        { key: "accessToken", label: "Access Token", type: "password" },
+        { key: "personUrn", label: "Person URN", type: "text" },
+      ],
+    },
+    instagram: {
+      name: "📸 Instagram",
+      fields: [
+        { key: "igUserId", label: "Instagram User ID", type: "text" },
+        { key: "accessToken", label: "Access Token", type: "password" },
+      ],
+    },
+  };
+
+  const fetchCredentials = async () => {
+    try {
+      const res = await fetch(`${API}/platforms/credentials`);
+      const data = await res.json();
+      setCredentials(Array.isArray(data) ? data : []);
+    } catch (e) { console.error(e); }
+  };
+
+  useEffect(() => { fetchCredentials(); }, []);
+
+  const saveCredentials = async (platform) => {
+    setSaving(true);
+    try {
+      await fetch(`${API}/platforms/credentials`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ platform, credentials: form }),
+      });
+      setEditing(null);
+      setForm({});
+      await fetchCredentials();
+    } catch (e) { console.error(e); }
+    setSaving(false);
+  };
+
+  const deleteCredentials = async (platform) => {
+    if (!confirm(`Remove ${platform} credentials?`)) return;
+    try {
+      await fetch(`${API}/platforms/credentials/${platform}`, { method: "DELETE" });
+      await fetchCredentials();
+    } catch (e) { console.error(e); }
+  };
+
+  const testConnection = async (platform) => {
+    setTesting(platform);
+    try {
+      const res = await fetch(`${API}/platforms/credentials/${platform}/test`, { method: "POST" });
+      const data = await res.json();
+      alert(data.success ? `✅ ${platform} connected!` : `❌ ${platform}: ${data.error || "Failed"}`);
+    } catch (e) { alert("❌ Test failed: " + e.message); }
+    setTesting(null);
+  };
+
+  const hasCredential = (platform) => credentials.some((c) => c.platform === platform);
+
+  return (
+    <div className="card" style={{ marginTop: 16 }}>
+      <div className="card-header">
+        <span className="card-title">🔗 Platform Connections</span>
+      </div>
+      <p style={{ color: "var(--text-dim)", marginBottom: 16, fontSize: 13 }}>
+        Connect your social media accounts to publish posts directly. Without credentials, posts use stub mode (mock).
+      </p>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
+        {Object.entries(platformDefs).map(([platform, def]) => {
+          const connected = hasCredential(platform);
+          const isEditing = editing === platform;
+
+          return (
+            <div key={platform} style={{
+              background: "var(--bg)",
+              border: `1px solid ${connected ? "var(--green)" : "var(--border)"}`,
+              borderRadius: 10,
+              padding: 16,
+            }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                <span style={{ fontWeight: 600, fontSize: 14 }}>{def.name}</span>
+                <span style={{
+                  fontSize: 10, padding: "2px 8px", borderRadius: 999,
+                  background: connected ? "rgba(34,197,94,0.15)" : "rgba(113,113,122,0.15)",
+                  color: connected ? "var(--green)" : "var(--text-dim)",
+                }}>
+                  {connected ? "✅ Connected" : "⚪ Not set"}
+                </span>
+              </div>
+
+              {isEditing ? (
+                <div>
+                  {def.fields.map((field) => (
+                    <div key={field.key} style={{ marginBottom: 8 }}>
+                      <label style={{ fontSize: 11, color: "var(--text-dim)", display: "block", marginBottom: 2 }}>{field.label}</label>
+                      <input
+                        type={field.type}
+                        value={form[field.key] || ""}
+                        onChange={(e) => setForm({ ...form, [field.key]: e.target.value })}
+                        placeholder={field.label}
+                        style={{ width: "100%", padding: "6px 10px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)", fontSize: 12 }}
+                      />
+                    </div>
+                  ))}
+                  <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                    <button className="btn btn-primary btn-sm" onClick={() => saveCredentials(platform)} disabled={saving}>
+                      {saving ? "..." : "💾 Save"}
+                    </button>
+                    <button className="btn btn-secondary btn-sm" onClick={() => { setEditing(null); setForm({}); }}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  <button className="btn btn-secondary btn-sm" onClick={() => {
+                    setEditing(platform);
+                    const existing = credentials.find((c) => c.platform === platform);
+                    setForm(existing ? {} : {});
+                  }}>
+                    {connected ? "✏️ Edit" : "➕ Setup"}
+                  </button>
+                  {connected && (
+                    <>
+                      <button className="btn btn-secondary btn-sm" onClick={() => testConnection(platform)} disabled={testing === platform}>
+                        {testing === platform ? "..." : "🧪 Test"}
+                      </button>
+                      <button className="btn btn-danger btn-sm" onClick={() => deleteCredentials(platform)}>
+                        🗑
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

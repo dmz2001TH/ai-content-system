@@ -104,7 +104,6 @@ function buildImagePrompt(content, topic, platform = "twitter") {
   const spec = PLATFORM_SPECS[platform] || PLATFORM_SPECS.twitter;
   const style = STYLE_PRESETS[spec.style] || STYLE_PRESETS.modern;
 
-  // Extract key visual concept from content
   const keyPhrases = content
     .replace(/[#@]\w+/g, "")
     .replace(/https?:\/\/\S+/g, "")
@@ -115,30 +114,30 @@ function buildImagePrompt(content, topic, platform = "twitter") {
     .join(", ");
 
   const categoryPrompts = {
-    tech: `Cutting-edge technology visualization: ${keyPhrases}. Futuristic interface, glowing data streams, holographic displays, dark background with neon blue and purple accents. Ultra-modern, sleek, professional.`,
+    tech: `Ultra-modern technology hero image: ${keyPhrases}. Sleek glassmorphism UI floating in space, holographic data visualization, ambient neon blue and purple glow, dark gradient background, bokeh light particles, Apple-level product photography, studio lighting with rim light accent, clean minimal composition with strong visual hierarchy. Shot on Hasselblad H6D, 85mm lens, f/1.4.`,
 
-    food: `Appetizing food photography: ${keyPhrases}. Beautifully plated dish, warm natural lighting, shallow depth of field, wooden table surface, fresh ingredients as props. Magazine-quality food photography.`,
+    food: `Michelin-star food photography: ${keyPhrases}. Artfully plated dish on dark slate surface, dramatic chiaroscuro lighting, steam rising, fresh herbs as garnish, copper utensils in background, shallow depth of field with creamy bokeh, overhead 45-degree angle, warm tungsten accent light, editorial food magazine cover quality. Phase One IQ4 150MP, 120mm macro lens.`,
 
-    fitness: `Dynamic fitness photography: ${keyPhrases}. Athletic person in motion, energetic pose, gym or outdoor setting, dramatic lighting, sweat and determination, motivational feel. Sports photography masterclass.`,
+    fitness: `High-energy fitness campaign shot: ${keyPhrases}. Athletic model in dynamic motion, dramatic side lighting with visible light rays, gym environment with modern equipment, sweat droplets frozen in motion, motivational atmosphere, dark moody background with pops of neon, Nike/Adidas campaign quality, sports photographer masterclass. Sony A1, 70-200mm f/2.8, high-speed sync flash.`,
 
-    travel: `Breathtaking travel photography: ${keyPhrases}. Stunning landscape, golden hour lighting, epic vista, sense of wonder and adventure, National Geographic quality, vivid colors, dramatic sky.`,
+    travel: `National Geographic award-winning landscape: ${keyPhrases}. Breathtaking vista, golden hour light painting the scene, dramatic cloud formations, leading lines drawing the eye, rich saturated colors, sense of scale with human element, ultra-wide perspective, hyperdetailed textures in rock and water, time-blended exposure for perfect dynamic range. DJI Mavic 3 Pro, Hasselblad lens, panoramic stitch.`,
 
-    finance: `Professional finance visualization: ${keyPhrases}. Clean data charts, upward trends, gold and green color scheme, modern office background, professional atmosphere, success imagery. Bloomberg terminal aesthetic.`,
+    finance: `Bloomberg Terminal meets modern design: ${keyPhrases}. Clean data visualization with glowing charts, upward trend arrows in gold, dark navy background, premium glass desk setup, subtle city skyline bokeh through floor-to-ceiling windows, executive boardroom atmosphere, wealth and success imagery, Fortune 500 corporate photography quality. Phase One XT, 55mm lens.`,
 
-    fashion: `High fashion editorial: ${keyPhrases}. Model in striking pose, dramatic lighting, luxury setting, bold color palette, Vogue magazine quality, artistic composition, haute couture feel.`,
+    fashion: `Vogue editorial fashion spread: ${keyPhrases}. High-fashion model in striking pose, dramatic Rembrandt lighting, luxury fabric textures, bold color palette against minimalist backdrop, haute couture styling, artistic composition with negative space, museum-quality fashion photography, Dior/Chanel campaign aesthetic. Hasselblad X2D, 80mm f/1.9, Profoto lighting.`,
 
-    education: `Educational illustration: ${keyPhrases}. Clean infographic style, knowledge symbols, books and light bulbs, organized layout, bright and inviting colors, professional educational material.`,
+    education: `Premium educational content design: ${keyPhrases}. Clean modern infographic with depth, floating 3D elements, gradient mesh background, knowledge symbols rendered in glass and light, organized visual hierarchy, bright inviting palette with professional polish, Duolingo/Notion level design quality, isometric perspective with soft shadows.`,
 
-    nature: `Stunning nature photography: ${keyPhrases}. Pristine landscape, dramatic weather, golden hour light, rich textures, environmental storytelling, conservation message, earth tones.`,
+    nature: `BBC Earth documentary still: ${keyPhrases}. Pristine wilderness, dramatic weather and lighting, rich organic textures, environmental storytelling, macro details in flora and fauna, conservation message, earth tones with vivid accents, time-lapse cloud trails, National Geographic photographer level composition. Nikon Z9, 400mm f/2.8 TC.`,
 
-    luxury: `Luxury lifestyle photography: ${keyPhrases}. Premium materials, gold and marble textures, elegant composition, soft studio lighting, exclusive atmosphere, high-end product placement.`,
+    luxury: `Robb Report luxury editorial: ${keyPhrases}. Premium materials—brushed gold, polished marble, Italian leather—arranged with precision, soft studio lighting with specular highlights, exclusive atmosphere, negative space for text overlay, high-end product placement, architectural digest meets haute horlogerie aesthetic. Sinar P3, 150mm lens, focus stacking.`,
 
-    modern: `Modern professional design: ${keyPhrases}. Clean composition, gradient background, geometric shapes, professional feel, contemporary aesthetic, balanced layout, trending design.`,
+    modern: `Apple-level product hero shot: ${keyPhrases}. Clean composition with strong focal point, subtle gradient background, professional studio lighting with soft fill and rim accent, geometric balance, contemporary aesthetic, premium feel with minimal elements, award-winning graphic design, perfect visual weight distribution. Phase One IQ4, 110mm lens, tethered capture.`,
   };
 
   const visualConcept = categoryPrompts[category] || categoryPrompts.modern;
 
-  return `${visualConcept} Aspect ratio ${spec.ratio}. ${style.suffix}. Professional social media content image, scroll-stopping visual, high engagement potential.`;
+  return `${visualConcept} Aspect ratio ${spec.ratio}. ${style.suffix}. Professional social media content image, scroll-stopping visual, high engagement potential. RAW quality, color graded in DaVinci Resolve, final output 8K resolution.`;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -198,8 +197,8 @@ export async function generatePostImage(content, topic, platform = "twitter") {
     console.log(`  Layer 2 (Fallback): Using base prompt`);
   }
 
-  // Layer 3: Final polish — add quality boosters
-  const finalPrompt = `${enhancedPrompt.substring(0, 300)}, masterpiece, best quality, highly detailed, professional, trending on social media, high engagement visual, no text, no watermark, no logo`;
+  // Layer 3: Final polish — add professional quality boosters
+  const finalPrompt = `${enhancedPrompt.substring(0, 300)}, masterpiece, best quality, highly detailed, professional, trending on social media, high engagement visual, no text, no watermark, no logo, no signature, sharp focus, perfect exposure, magazine cover quality, award-winning photography`;
 
   console.log(`  Layer 3 (Final): ${finalPrompt.substring(0, 100)}...`);
 
@@ -227,7 +226,6 @@ export async function generateBatchImages(posts) {
     try {
       const result = await generatePostImage(post.content, post.topic, post.platform);
       results.push({ postId: post.id, ...result });
-      // Rate limit: wait between requests
       await new Promise((r) => setTimeout(r, 2000));
     } catch (e) {
       results.push({ postId: post.id, error: e.message });
@@ -235,10 +233,6 @@ export async function generateBatchImages(posts) {
   }
   return results;
 }
-
-// ═══════════════════════════════════════════════════════════════
-// CONTENT ANALYSIS FOR IMAGE
-// ═══════════════════════════════════════════════════════════════
 
 export async function analyzeContentForImage(content) {
   const response = await chat(`Analyze this social media post and suggest the BEST visual style for maximum engagement:

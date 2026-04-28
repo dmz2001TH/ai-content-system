@@ -243,14 +243,33 @@ app.post("/generate", async (req, res) => {
       { postId: savedPost.id, score: review.finalScore, attempts }
     );
 
+    // ═══ Auto-generate image ═══
+    let imageUrl = null;
+    let imagePrompt = null;
+    try {
+      console.log("  🎨 Auto-generating image...");
+      const imgResult = await generatePostImage(post.content, post.topic || config.niche, post.platform || "twitter");
+      imageUrl = imgResult.imageUrl;
+      imagePrompt = imgResult.imagePrompt;
+      await prisma.post.update({
+        where: { id: savedPost.id },
+        data: { mediaUrl: imageUrl, imagePrompt },
+      });
+      console.log("  ✅ Image generated!");
+      await logActivity("image.auto_generated", "Image auto-generated with post", { postId: savedPost.id });
+    } catch (imgErr) {
+      console.error("  ⚠️ Auto-image failed (post still saved):", imgErr.message);
+    }
+
     res.json({
-      post: serializePost(savedPost),
+      post: serializePost({ ...savedPost, mediaUrl: imageUrl, imagePrompt }),
       review: {
         score: review.finalScore,
         passed: review.passed,
         attempts,
         details: review,
       },
+      image: imageUrl ? { url: imageUrl, prompt: imagePrompt } : null,
     });
   } catch (error) {
     console.error("Generate error:", error);
@@ -269,7 +288,16 @@ app.post("/post/:id", async (req, res) => {
     if (!post) return res.status(404).json({ error: "Post not found" });
     if (post.status === "posted") return res.status(400).json({ error: "Already posted" });
 
-    const result = await postToPlatform(post.platform, post.content);
+    // Get stored credentials for this platform
+    let platformCreds = null;
+    try {
+      const cred = await prisma.platformCredential.findUnique({
+        where: { userId_platform: { userId: post.userId, platform: post.platform } }
+      });
+      if (cred) platformCreds = JSON.parse(cred.credentials || "{}");
+    } catch (e) { /* no credentials, use stub */ }
+
+    const result = await postToPlatform(post.platform, post.content, platformCreds);
 
     const updated = await prisma.post.update({
       where: { id: post.id },
@@ -333,7 +361,21 @@ app.post("/generate/batch", async (req, res) => {
             reviewDetails: JSON.stringify(review),
           },
         });
-        results.push(serializePost(saved));
+
+        // Auto-generate image for batch post
+        let batchImgUrl = null;
+        try {
+          const imgResult = await generatePostImage(post.content, post.topic || config.niche, post.platform || "twitter");
+          batchImgUrl = imgResult.imageUrl;
+          await prisma.post.update({
+            where: { id: saved.id },
+            data: { mediaUrl: batchImgUrl, imagePrompt: imgResult.imagePrompt },
+          });
+        } catch (imgErr) {
+          console.error("  ⚠️ Batch image failed:", imgErr.message);
+        }
+
+        results.push(serializePost({ ...saved, mediaUrl: batchImgUrl }));
       } catch (e) {
         results.push({ error: e.message });
       }
@@ -946,6 +988,80 @@ app.get("/promptdee/status", async (req, res) => {
     const status = await promptdeeStatus();
     const usage = await getUsageStats();
     res.json({ status, usage });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
+
+// ═══════════════════════════════════════════════════════════════
+// PLATFORM CREDENTIALS
+// ═══════════════════════════════════════════════════════════════
+
+app.get("/platforms/credentials", async (req, res) => {
+  try {
+    const userId = req.query.userId || (await getDefaultUserId());
+    const creds = await prisma.platformCredential.findMany({ where: { userId } });
+    // Mask sensitive values for display
+    const masked = creds.map((c) => {
+      const data = JSON.parse(c.credentials || "{}");
+      const maskedData = {};
+      for (const [key, val] of Object.entries(data)) {
+        if (typeof val === "string" && val.length > 8) {
+          maskedData[key] = val.substring(0, 4) + "••••" + val.substring(val.length - 4);
+        } else {
+          maskedData[key] = val;
+        }
+      }
+      return { id: c.id, platform: c.platform, credentials: maskedData, isActive: c.isActive, updatedAt: c.updatedAt };
+    });
+    res.json(masked);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/platforms/credentials", async (req, res) => {
+  try {
+    const userId = req.body.userId || (await getDefaultUserId());
+    const { platform, credentials } = req.body;
+    if (!platform || !credentials) return res.status(400).json({ error: "platform and credentials required" });
+
+    const saved = await prisma.platformCredential.upsert({
+      where: { userId_platform: { userId, platform } },
+      update: { credentials: JSON.stringify(credentials), isActive: true },
+      create: { userId, platform, credentials: JSON.stringify(credentials), isActive: true },
+    });
+
+    await logActivity("credentials.updated", `Credentials updated for ${platform}`, { platform });
+    res.json({ id: saved.id, platform: saved.platform, isActive: saved.isActive, message: "Credentials saved" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete("/platforms/credentials/:platform", async (req, res) => {
+  try {
+    const userId = req.query.userId || (await getDefaultUserId());
+    await prisma.platformCredential.delete({ where: { userId_platform: { userId, platform: req.params.platform } } });
+    await logActivity("credentials.deleted", `Credentials removed for ${req.params.platform}`, { platform: req.params.platform });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/platforms/credentials/:platform/test", async (req, res) => {
+  try {
+    const userId = req.body.userId || (await getDefaultUserId());
+    const cred = await prisma.platformCredential.findUnique({ where: { userId_platform: { userId, platform: req.params.platform } } });
+    if (!cred) return res.status(404).json({ error: "No credentials found" });
+
+    const { postToPlatform } = await import("@ai-content/social");
+    const creds = JSON.parse(cred.credentials || "{}");
+    const result = await postToPlatform(req.params.platform, "🧪 Connection test — AI Content System", creds);
+    res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
