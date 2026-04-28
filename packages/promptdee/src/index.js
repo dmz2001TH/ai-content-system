@@ -198,7 +198,7 @@ export async function generatePostImage(content, topic, platform = "twitter") {
   }
 
   // Layer 3: Final polish — add professional quality boosters
-  const finalPrompt = `${enhancedPrompt.substring(0, 300)}, masterpiece, best quality, highly detailed, professional, trending on social media, high engagement visual, no text, no watermark, no logo, no signature, sharp focus, perfect exposure, magazine cover quality, award-winning photography`;
+  const finalPrompt = `${enhancedPrompt.substring(0, 300)}, masterpiece, best quality, highly detailed, professional, trending on social media, high engagement visual, no text, no letters, no words, no typography, no writing, no watermark, no logo, no signature, sharp focus, perfect exposure, magazine cover quality, award-winning photography`;
 
   console.log(`  Layer 3 (Final): ${finalPrompt.substring(0, 100)}...`);
 

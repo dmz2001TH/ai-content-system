@@ -4,7 +4,10 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.js"
+    ".": "./src/index.js",
+    "./src/text-overlay.js": "./src/text-overlay.js"
   },
-  "dependencies": {}
+  "dependencies": {
+    "canvas": "^3.2.3"
+  }
 }

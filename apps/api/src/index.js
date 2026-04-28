@@ -10,12 +10,22 @@ import {
 } from "@ai-content/ai";
 import { postToPlatform } from "@ai-content/social";
 import { generatePostImage, checkStatus as promptdeeStatus, getUsageStats } from "@ai-content/promptdee";
+import { overlayText } from "@ai-content/promptdee/src/text-overlay.js";
+import { writeFileSync, mkdirSync, existsSync } from "fs";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const OVERLAY_DIR = join(__dirname, "..", "public", "overlays");
+if (!existsSync(OVERLAY_DIR)) mkdirSync(OVERLAY_DIR, { recursive: true });
 
 const app = express();
 const PORT = process.env.API_PORT || 3001;
 
 app.use(cors());
 app.use(express.json());
+app.use("/overlays", (await import("express")).default.static(OVERLAY_DIR));
 
 // ═══════════════════════════════════════════════════════════════
 // HELPERS — JSON parse for SQLite string fields
@@ -243,20 +253,36 @@ app.post("/generate", async (req, res) => {
       { postId: savedPost.id, score: review.finalScore, attempts }
     );
 
-    // ═══ Auto-generate image ═══
+    // ═══ Auto-generate image with text overlay ═══
     let imageUrl = null;
     let imagePrompt = null;
     try {
       console.log("  🎨 Auto-generating image...");
       const imgResult = await generatePostImage(post.content, post.topic || config.niche, post.platform || "twitter");
-      imageUrl = imgResult.imageUrl;
       imagePrompt = imgResult.imagePrompt;
+
+      // Overlay text on the generated image
+      console.log("  ✍️ Adding text overlay...");
+      const overlayBuffer = await overlayText(imgResult.imageUrl, {
+        hook: post.hook || post.content.substring(0, 100),
+        content: post.content,
+        hashtags: post.hashtags || [],
+        platform: post.platform || "twitter",
+        style: "modern",
+      });
+
+      // Save overlaid image to local file
+      const filename = `post_${savedPost.id}_${Date.now()}.png`;
+      const filepath = join(OVERLAY_DIR, filename);
+      writeFileSync(filepath, overlayBuffer);
+      imageUrl = `/overlays/${filename}`;
+      console.log("  ✅ Image with text overlay generated!");
+
       await prisma.post.update({
         where: { id: savedPost.id },
         data: { mediaUrl: imageUrl, imagePrompt },
       });
-      console.log("  ✅ Image generated!");
-      await logActivity("image.auto_generated", "Image auto-generated with post", { postId: savedPost.id });
+      await logActivity("image.auto_generated", "Image auto-generated with text overlay", { postId: savedPost.id });
     } catch (imgErr) {
       console.error("  ⚠️ Auto-image failed (post still saved):", imgErr.message);
     }
@@ -362,11 +388,21 @@ app.post("/generate/batch", async (req, res) => {
           },
         });
 
-        // Auto-generate image for batch post
+        // Auto-generate image with text overlay for batch post
         let batchImgUrl = null;
         try {
           const imgResult = await generatePostImage(post.content, post.topic || config.niche, post.platform || "twitter");
-          batchImgUrl = imgResult.imageUrl;
+          const overlayBuffer = await overlayText(imgResult.imageUrl, {
+            hook: post.hook || post.content.substring(0, 100),
+            content: post.content,
+            hashtags: post.hashtags || [],
+            platform: post.platform || "twitter",
+            style: "modern",
+          });
+          const filename = `post_${saved.id}_${Date.now()}.png`;
+          const filepath = join(OVERLAY_DIR, filename);
+          writeFileSync(filepath, overlayBuffer);
+          batchImgUrl = `/overlays/${filename}`;
           await prisma.post.update({
             where: { id: saved.id },
             data: { mediaUrl: batchImgUrl, imagePrompt: imgResult.imagePrompt },
