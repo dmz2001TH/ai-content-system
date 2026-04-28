@@ -15,11 +15,9 @@ set OPENAI_MODEL=deepseek-chat
 set API_PORT=3001
 set WEB_PORT=3000
 
-echo  [OK] Environment variables set
 echo  [OK] Starting API + Worker + Web...
-echo.
-echo  Open browser: http://localhost:3000
-echo  Press Ctrl+C to stop
+echo  [OK] Open browser: http://localhost:3000
+echo  [OK] Press Ctrl+C to stop
 echo.
 
 npm run dev
