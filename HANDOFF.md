@@ -200,3 +200,41 @@ All tests passed on Linux (Node.js v22, Prisma 6.19.3):
 - Score: 91/100 (all 5 gates passed)
 - Image: `https://replicate.delivery/xezq/...out-0.webp` ✅
 - Post saved with `mediaUrl` and `imagePrompt` fields
+
+---
+
+## 🆕 Update: Text Overlay (2026-04-29 06:17 GMT+8)
+
+**Commit:** `7a3f248` — feat: text overlay with Thai support
+
+### Problem Solved
+AI image generation models (DALL-E, Stable Diffusion, etc.) produce garbled text, especially Thai. Solution: generate clean background images with AI → overlay text using Canvas.
+
+### New Files
+- `packages/promptdee/src/text-overlay.js` — Text overlay engine
+- `packages/promptdee/fonts/NotoSansThai-Regular.ttf` — Thai font
+- `packages/promptdee/fonts/NotoSansThai-Bold.ttf` — Thai bold font
+
+### Dependencies Added
+- `canvas` (v3.2.3) — Node.js Canvas for text rendering
+- `sharp` — WebP → PNG conversion (PromptDee returns WebP)
+
+### How It Works
+1. PromptDee generates AI image → returns WebP URL
+2. `sharp` converts WebP → PNG buffer
+3. `canvas` renders text on top with professional styling
+4. Final image saved to `apps/api/public/overlays/`
+5. Served via Express static: `/overlays/filename.png`
+
+### Style Presets
+- `modern` — Dark gradient, indigo accent, badge
+- `minimal` — Semi-transparent overlay, centered text
+- `bold` — Purple gradient, gold accent
+- `elegant` — Dark overlay, warm gold accent
+- `tech` — Dark navy, cyan accent
+
+### Test Results
+- ✅ Thai text: "AI เปลี่ยนโลกแล้ว!" — renders cleanly
+- ✅ English text: "The Future is NOW" — renders cleanly
+- ✅ 1200x675 (Twitter), 1080x1080 (Instagram) — correct dimensions
+- ✅ API auto-generates overlaid images on post creation
