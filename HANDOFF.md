@@ -7,11 +7,13 @@
 | Project Structure (monorepo) | ✅ เสร็จ | npm workspaces |
 | Database (SQLite + Prisma) | ✅ เสร็จ | schema, seed, migrate |
 | AI Module (generate + review) | ✅ เสร็จ | 5-gate review, rewrite, weekly analysis |
-| API Server (Express) | ✅ เสร็จ | 12 endpoints, tested |
+| API Server (Express) | ✅ เสร็จ | 16 endpoints, tested |
 | Worker (node-cron) | ✅ เสร็จ | auto-gen, auto-post, weekly report |
-| Frontend (Next.js) | ✅ เสร็จ | 6 pages dashboard |
+| Frontend (Next.js) | ✅ เสร็จ | 8 pages dashboard |
 | Social Stubs | ✅ เสร็จ | Twitter/FB/LinkedIn/Instagram |
 | OpenAI + Deepseek support | ✅ เสร็จ | base_url configurable |
+| Calendar & Tasks | ✅ เสร็จ | monthly view, task board, scheduling |
+| Image Generation (PromptDee) | ✅ เสร็จ | flux-schnell, generate per post |
 | End-to-end test | ⚠️ ต้องใส่ API key | ไม่มี key = รันไม่ได้ |
 
 ---
@@ -41,7 +43,7 @@ ai-content-system/          ← npm workspaces monorepo
 - **ActivityLog** — action, message, details
 - **WeeklyReport** — stats, analysis, recommendations
 
-### API Endpoints (12)
+### API Endpoints (16)
 | Method | Path | ใช้ทำอะไร |
 |--------|------|----------|
 | GET | /health | เช็ค server + db |
@@ -56,6 +58,11 @@ ai-content-system/          ← npm workspaces monorepo
 | DELETE | /posts/:id | ลบ post |
 | GET | /reports/weekly | Weekly AI report |
 | GET | /logs | Activity log |
+| GET | /calendar | **ปฏิทินรายเดือน** |
+| POST | /posts/:id/schedule | **จองวันโพสต์** |
+| GET | /tasks | **Task board (today/upcoming/overdue)** |
+| POST | /posts/:id/generate-image | **Generate รูปด้วย PromptDee** |
+| GET | /promptdee/status | PromptDee API status |
 
 ### AI Review Pipeline (5 Gates)
 1. **Brand Safety** — hate speech, misinformation, controversial topics → FAIL = ทิ้งทันที
@@ -64,13 +71,21 @@ ai-content-system/          ← npm workspaces monorepo
 4. **Quality & Engagement** — hook, clarity, CTA → < 75 = rewrite
 5. **Uniqueness** — check against history → too similar = regenerate
 
-### Frontend Dashboard (6 pages)
+### Frontend Dashboard (8 pages)
 1. **📊 Dashboard** — stats grid + quick generate + recent posts
 2. **🤖 Generate** — single/batch + 5-gate review visualization
-3. **📝 All Posts** — filter by status, publish/delete
-4. **⚙️ Config** — niche, tone, platforms, frequency, do-not-touch, brand voice, language
-5. **📈 Reports** — weekly AI analysis with best/worst posts
-6. **📋 Activity Log** — system activity history
+3. **📝 All Posts** — filter by status, publish/delete, generate image
+4. **📅 Calendar** — monthly calendar view with post indicators
+5. **✅ Tasks** — task board (today/upcoming/overdue) + schedule
+6. **⚙️ Config** — niche, tone, platforms, frequency, do-not-touch, brand voice, language
+7. **📈 Reports** — weekly AI analysis with best/worst posts
+8. **📋 Activity Log** — system activity history
+
+### Image Generation (PromptDee API)
+- **Model:** flux-schnell (free)
+- **Features:** Chat (gpt-4o-mini), Image gen, Prompt enhancement
+- **Endpoint:** POST /posts/:id/generate-image
+- **Flow:** Post content → AI creates image prompt → Enhance prompt → Generate image → Save URL
 
 ### Worker (Cron Jobs)
 - **Every 4 hours** — auto-generate content (respects daily frequency limit)
