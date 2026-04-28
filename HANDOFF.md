@@ -1,227 +1,172 @@
-# AI Content System — Handoff Document
+# 🤖 AI Content System — Agent Handoff
 
-## 📋 สถานะปัจจุบัน
-
-| Module | Status | หมายเหตุ |
-|--------|--------|----------|
-| Project Structure (monorepo) | ✅ เสร็จ | npm workspaces |
-| Database (SQLite + Prisma) | ✅ เสร็จ | schema, seed, migrate |
-| AI Module (generate + review) | ✅ เสร็จ | 5-gate review, rewrite, weekly analysis |
-| API Server (Express) | ✅ เสร็จ | 16 endpoints, tested |
-| Worker (node-cron) | ✅ เสร็จ | auto-gen, auto-post, weekly report |
-| Frontend (Next.js) | ✅ เสร็จ | 8 pages dashboard |
-| Social Stubs | ✅ เสร็จ | Twitter/FB/LinkedIn/Instagram |
-| OpenAI + Deepseek support | ✅ เสร็จ | base_url configurable |
-| Calendar & Tasks | ✅ เสร็จ | monthly view, task board, scheduling |
-| Image Generation (PromptDee) | ✅ เสร็จ | flux-schnell, generate per post |
-| End-to-end test | ⚠️ ต้องใส่ API key | ไม่มี key = รันไม่ได้ |
+> Last updated: 2026-04-29 05:58 GMT+8
+> Commit: `c455e39` — feat: auto image gen, platform credentials UI, pro image quality, image display in tasks
 
 ---
 
-## 🏗️ สิ่งที่มี (What's Built)
+## 📋 Project Overview
 
-### Architecture
+**Repo:** https://github.com/dmz2001TH/ai-content-system
+**Stack:** Next.js 15 + Express 5 + Prisma (SQLite) + DeepSeek AI + PromptDee Image Gen
+**Structure:** Monorepo (npm workspaces)
+
 ```
-ai-content-system/          ← npm workspaces monorepo
-├── apps/
-│   ├── api/                ← Express API server (:3001)
-│   ├── worker/             ← Cron scheduler (auto-gen + auto-post)
-│   └── web/                ← Next.js dashboard (:3000)
-├── packages/
-│   ├── db/                 ← Prisma schema + SQLite
-│   ├── ai/                 ← OpenAI/Deepseek integration
-│   └── social/             ← Social media posting stubs
-├── .env.example            ← Config template
-├── docker-compose.yml      ← PostgreSQL + Redis (optional)
-└── package.json            ← Root workspace config
+apps/
+  web/          → Next.js frontend (port 3000)
+  api/          → Express API server (port 3001)
+  worker/       → Cron worker (auto-generate, auto-post, weekly report)
+packages/
+  db/           → Prisma schema + SQLite database
+  ai/           → DeepSeek AI integration (content gen, 5-gate review)
+  social/       → Social media posting (Twitter, Facebook, LinkedIn, Instagram)
+  promptdee/    → Image generation via PromptDee API
 ```
 
-### Database Schema (5 tables)
-- **User** — id, email, name
-- **Config** — niche, tone, platforms, frequency, doNotTouch, brandVoice, language
-- **Post** — content, score, status, topic, hook, hashtags, reviewDetails, engagement
-- **ActivityLog** — action, message, details
-- **WeeklyReport** — stats, analysis, recommendations
-
-### API Endpoints (16)
-| Method | Path | ใช้ทำอะไร |
-|--------|------|----------|
-| GET | /health | เช็ค server + db |
-| GET | /config | ดู config |
-| POST | /config | ตั้งค่า config |
-| GET | /posts | ดู posts (filter by status/platform) |
-| GET | /posts/stats | สรุป stats |
-| GET | /posts/:id | ดู post เดียว |
-| POST | /generate | **Generate + 5-gate review** |
-| POST | /generate/batch | Batch generate (สูงสุด 10) |
-| POST | /post/:id | Publish post |
-| DELETE | /posts/:id | ลบ post |
-| GET | /reports/weekly | Weekly AI report |
-| GET | /logs | Activity log |
-| GET | /calendar | **ปฏิทินรายเดือน** |
-| POST | /posts/:id/schedule | **จองวันโพสต์** |
-| GET | /tasks | **Task board (today/upcoming/overdue)** |
-| POST | /posts/:id/generate-image | **Generate รูปด้วย PromptDee** |
-| GET | /promptdee/status | PromptDee API status |
-
-### AI Review Pipeline (5 Gates)
-1. **Brand Safety** — hate speech, misinformation, controversial topics → FAIL = ทิ้งทันที
-2. **Fact Check** — verify claims → FAIL = regenerate
-3. **Tone Match** — score 1-100 → < 70 = rewrite
-4. **Quality & Engagement** — hook, clarity, CTA → < 75 = rewrite
-5. **Uniqueness** — check against history → too similar = regenerate
-
-### Frontend Dashboard (8 pages)
-1. **📊 Dashboard** — stats grid + quick generate + recent posts
-2. **🤖 Generate** — single/batch + 5-gate review visualization
-3. **📝 All Posts** — filter by status, publish/delete, generate image
-4. **📅 Calendar** — monthly calendar view with post indicators
-5. **✅ Tasks** — task board (today/upcoming/overdue) + schedule
-6. **⚙️ Config** — niche, tone, platforms, frequency, do-not-touch, brand voice, language
-7. **📈 Reports** — weekly AI analysis with best/worst posts
-8. **📋 Activity Log** — system activity history
-
-### Image Generation (PromptDee API)
-- **Model:** flux-schnell (free)
-- **Features:** Chat (gpt-4o-mini), Image gen, Prompt enhancement
-- **Endpoint:** POST /posts/:id/generate-image
-- **Flow:** Post content → AI creates image prompt → Enhance prompt → Generate image → Save URL
-
-### Worker (Cron Jobs)
-- **Every 4 hours** — auto-generate content (respects daily frequency limit)
-- **Every 6 hours** — auto-publish approved posts
-- **Monday 9 AM** — weekly report generation
+**Environment:** Windows, uses `.bat` file to start (`set DATABASE_URL=file:./dev.db`)
+**AI Model:** DeepSeek Chat (`https://api.deepseek.com/v1`)
+**Image Gen:** PromptDee (`https://www.promptdee.net/api`) — free, no key needed
 
 ---
 
-## ⚠️ สิ่งที่ต้องทำต่อ (TODO)
+## ✅ What's DONE
 
-### จำเป็น (Required)
-1. **ใส่ LLM API key** — แก้ `.env` ใส่ OpenAI หรือ Deepseek key
-2. **Test generate จริง** — ทดสอบว่า AI content ออกมาดี
-3. **ปรับ prompt tuning** — ปรับ system prompt ให้เหมาะกับ niche จริง
+### Phase 1: Bug Fixes (Initial Request)
+- [x] Diagnosed 500 Internal Server Error on all API endpoints
+- [x] Root cause: Prisma DB not initialized + DATABASE_URL path mismatch
+- [x] Fixed `DATABASE_URL` path in `.bat` → `file:./packages/db/prisma/dev.db`
+- [x] Ran `prisma generate` + `prisma db push` to sync schema
 
-### ควรทำ (Nice to have)
-4. **Social API integration** — เชื่อม Twitter/Facebook/LinkedIn จริง (ตอนนี้เป็น stub)
-5. **Embedding-based uniqueness** — ใช้ pgvector เทียบ embedding (ตอนนี้ stub)
-6. **Image generation** — เพิ่ม DALL-E/Flux สำหรับ generate รูป
-7. **Authentication** — เพิ่ม login (ตอนนี้ใช้ default user)
-8. **Deploy** — ขึ้น VPS/Railway/Vercel
+### Phase 2: Feature — Auto Image Generation
+- [x] **API `/generate`** — Auto-generates image after creating post (single + batch)
+- [x] **API `/generate/batch`** — Same for batch generation
+- [x] **Frontend Dashboard** — Shows generated image in "Last Review" panel
+- [x] **Frontend Posts** — Image thumbnails display in post cards
+- [x] **Frontend Tasks** — Images show for today/upcoming/overdue tasks
+- [x] Removed manual "🎨 Image" button (now automatic)
+
+### Phase 3: Feature — Platform Credentials UI
+- [x] **Prisma schema** — Added `PlatformCredential` model (userId, platform, credentials JSON, isActive)
+- [x] **API endpoints:**
+  - `GET /platforms/credentials` — List credentials (masked for security)
+  - `POST /platforms/credentials` — Save/update credentials
+  - `DELETE /platforms/credentials/:platform` — Remove credentials
+  - `POST /platforms/credentials/:platform/test` — Test connection
+- [x] **Frontend Config page** — "🔗 Platform Connections" section with:
+  - Twitter: API Key, API Secret, Access Token, Access Token Secret
+  - Facebook: Page ID, Page Access Token
+  - LinkedIn: Access Token, Person URN
+  - Instagram: Instagram User ID, Access Token
+  - Edit / Test / Delete buttons per platform
+  - Connection status badges (✅ Connected / ⚪ Not set)
+
+### Phase 4: Feature — Real Social Media Integration
+- [x] **packages/social/src/index.js** — Real API calls (not just stubs):
+  - Twitter: OAuth 1.0a + API v2
+  - Facebook: Graph API v19.0
+  - LinkedIn: UGC Posts API v2
+  - Instagram: Facebook Graph API (media container → publish)
+  - Falls back to stub mode when no credentials stored
+- [x] **API publish endpoint** — Uses stored credentials from DB
+
+### Phase 5: Feature — Professional Image Quality
+- [x] **packages/promptdee/src/index.js** — Upgraded prompts:
+  - Camera/lens specs (Hasselblad H6D, Phase One IQ4, Sony A1)
+  - Lighting techniques (Rembrandt, chiaroscuro, rim light)
+  - Professional references (Vogue, Bloomberg, National Geographic, Apple)
+  - 8K resolution, DaVinci Resolve color grading
+  - Per-category specialized prompts (tech, food, fitness, travel, finance, fashion, education, nature, luxury)
 
 ---
 
-## 🚀 วิธีติดตั้ง (Installation)
+## ❌ What's NOT Done / Known Issues
 
-### ขั้นตอน
-```bash
-# 1. Clone repo
-git clone https://github.com/YOUR_USERNAME/ai-content-system.git
+### Not Implemented
+- [ ] **Seed data** — `packages/db/src/seed.js` exists but may need updating for new schema
+- [ ] **Worker auto-image** — `apps/worker/src/index.js` still generates posts WITHOUT auto-images (only API does)
+- [ ] **Image in post preview** — `/posts/:id/preview` endpoint doesn't include image display
+- [ ] **Delete old images** — No cleanup when regenerating images
+- [ ] **Image upload** — Can't upload custom images, only AI-generated
+
+### Known Issues
+- [ ] **Express 5 compatibility** — Using `express@^5.1.0`, some edge cases may exist
+- [ ] **Prisma EPERM on Windows** — `prisma generate` fails if files are locked by running process. Workaround: stop dev server first, delete `node_modules/.prisma/client/`, then regenerate
+- [ ] **DATABASE_URL path** — Relative path `file:./dev.db` resolves differently depending on CWD. Current fix: `.bat` sets absolute-ish path. May need `file:./packages/db/prisma/dev.db` in `.env` too
+- [ ] **`/posts/search` route order** — Defined AFTER `/posts/:id`, so "search" gets matched as `:id`. Should be moved before `/posts/:id`
+- [ ] **PromptDee rate limits** — Image gen has 2s delay between batch requests. May hit limits on large batches
+- [ ] **OAuth 1.0a for Twitter** — Uses `require("crypto")` in ESM module (should be `import`)
+
+### Security Notes
+- [ ] **`.bat` file has API key** — Should be in `.gitignore`, use `.env` instead
+- [ ] **Credentials stored as plain JSON** — Should encrypt at rest
+- [ ] **GitHub token in chat** — User shared PAT in conversation, consider rotating
+
+---
+
+## 🔧 How to Run (Windows)
+
+```bat
+# 1. Clone
+git clone https://github.com/dmz2001TH/ai-content-system.git
 cd ai-content-system
 
-# 2. ติดตั้ง dependencies
+# 2. Install
 npm install
 
-# 3. Setup database
-npx prisma generate --schema=packages/db/prisma/schema.prisma
-npx prisma db push --schema=packages/db/prisma/schema.prisma
-npm run db:seed
+# 3. Setup DB
+cd packages\db
+npx prisma generate
+npx prisma db push
+cd ..\..
 
-# 4. ตั้งค่า API key
-cp .env.example .env
-# แก้ .env ใส่ API key (OpenAI หรือ Deepseek)
+# 4. Create .env (copy from .env.example)
+# Set DATABASE_URL=file:./packages/db/prisma/dev.db
 
-# 5. รัน (3 terminals)
-npm run dev:api       # Terminal 1 — API server :3001
-npm run dev:worker    # Terminal 2 — Cron worker
-npm run dev:web       # Terminal 3 — Frontend :3000
-
-# 6. เปิด browser
-open http://localhost:3000
+# 5. Run
+npm run dev
 ```
 
-### LLM Options
-```bash
-# OpenAI:
-OPENAI_API_KEY="sk-..."
-OPENAI_BASE_URL="https://api.openai.com/v1"
-OPENAI_MODEL="gpt-4o"
+**Access:** http://localhost:3000
 
-# Deepseek:
-OPENAI_API_KEY="sk-..."
-OPENAI_BASE_URL="https://api.deepseek.com/v1"
-OPENAI_MODEL="deepseek-chat"
+---
+
+## 🗺️ Architecture Flow
+
+```
+User opens http://localhost:3000
+    ↓
+Next.js (web) serves React dashboard
+    ↓
+Frontend calls /api/* endpoints
+    ↓
+Next.js rewrites /api/* → http://localhost:3001/*
+    ↓
+Express API (port 3001)
+    ├── GET/POST /config → Prisma (SQLite)
+    ├── POST /generate → DeepSeek AI (content) + PromptDee (image) + Prisma (save)
+    ├── GET /posts → Prisma
+    ├── POST /post/:id → Social module (with stored credentials)
+    ├── GET/POST /platforms/credentials → Prisma
+    └── ... other endpoints
+    ↓
+Worker (cron) runs independently
+    ├── Every 4h: Generate posts (no auto-image)
+    ├── Every 6h: Auto-post approved content
+    └── Monday 9AM: Weekly report
 ```
 
 ---
 
-## 🔄 Flow การทำงาน
+## 📝 Next Agent TODO (Priority Order)
 
-```
-User เปิด Dashboard (localhost:3000)
-    │
-    ├─ ตั้งค่า Config (niche, tone, platforms, frequency)
-    │
-    ├─ กด "Generate Post"
-    │   │
-    │   ▼
-    │   API: POST /generate
-    │   │
-    │   ├─ 1. generatePost() ← เรียก LLM
-    │   ├─ 2. reviewPost() ← 5-gate review
-    │   │   ├─ Gate 1: Brand Safety (FAIL → ทิ้ง)
-    │   │   ├─ Gate 2: Fact Check (FAIL → regenerate)
-    │   │   ├─ Gate 3: Tone Match (< 70 → rewrite)
-    │   │   ├─ Gate 4: Quality (< 75 → rewrite)
-    │   │   └─ Gate 5: Uniqueness (too similar → regenerate)
-    │   ├─ 3. ถ้าไม่ผ่าน → rewrite + review อีกรอบ (สูงสุด 3 ครั้ง)
-    │   └─ 4. Save to DB → ส่งกลับ
-    │
-    ├─ ดู Posts → filter, publish, delete
-    │
-    ├─ Worker (background)
-    │   ├─ ทุก 4 ชม: auto-generate ตาม frequency
-    │   ├─ ทุก 6 ชม: auto-publish approved posts
-    │   └─ จันทร์ 9 โมง: weekly report
-    │
-    └─ ดู Weekly Report → AI analysis + recommendations
-```
+1. **Fix `/posts/search` route order** — Move before `/posts/:id` in API
+2. **Add auto-image to Worker** — Worker should also generate images
+3. **Encrypt platform credentials** — Don't store API tokens as plain JSON
+4. **Add `.env.example` to repo, `.bat` to `.gitignore`**
+5. **Fix Twitter OAuth** — Change `require("crypto")` to `import`
+6. **Test all platform integrations** — Verify real API calls work
+7. **Add image regeneration** — Allow re-generating images for existing posts
+8. **Add custom image upload** — Let users upload their own images
 
 ---
 
-## 📁 ไฟล์ทั้งหมด (23 files)
-
-```
-ai-content-system/
-├── package.json                          ← Root workspace
-├── .env.example                          ← Config template
-├── .env                                  ← Actual config (gitignore)
-├── docker-compose.yml                    ← PostgreSQL + Redis (optional)
-├── HANDOFF.md                            ← This file
-├── packages/
-│   ├── db/
-│   │   ├── package.json
-│   │   ├── prisma/schema.prisma          ← Database schema
-│   │   └── src/
-│   │       ├── index.js                  ← Prisma client export
-│   │       └── seed.js                   ← Sample data
-│   ├── ai/
-│   │   ├── package.json
-│   │   └── src/index.js                  ← AI generate + 5-gate review
-│   └── social/
-│       ├── package.json
-│       └── src/index.js                  ← Social media stubs
-└── apps/
-    ├── api/
-    │   ├── package.json
-    │   └── src/index.js                  ← Express API (12 endpoints)
-    ├── worker/
-    │   ├── package.json
-    │   └── src/index.js                  ← Cron jobs
-    └── web/
-        ├── package.json
-        ├── next.config.js                ← API proxy
-        └── app/
-            ├── layout.js                 ← HTML layout
-            ├── globals.css               ← Dark theme styles
-            └── page.js                   ← Dashboard (6 pages)
-```
